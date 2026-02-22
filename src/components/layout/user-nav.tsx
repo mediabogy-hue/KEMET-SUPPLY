@@ -26,7 +26,7 @@ export function UserNav() {
   const handleSignOut = () => {
     if (!auth) return;
     signOut(auth).then(() => {
-      router.push('/');
+      router.push('/register');
     });
   }
 
