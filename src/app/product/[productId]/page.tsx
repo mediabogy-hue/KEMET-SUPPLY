@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 
-import type { Product, Payment, ReferredCustomer } from '@/lib/types';
+import type { Product, Payment, ReferredCustomer, Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -262,7 +262,7 @@ export default function PublicProductPage() {
 
         const batch = writeBatch(firestore);
 
-        const orderData: any = {
+        const orderData: Partial<Order> = {
             id: newOrderId,
             dropshipperId,
             dropshipperName,
@@ -281,8 +281,8 @@ export default function PublicProductPage() {
             totalCommission: (product.commission || 0) * data.quantity,
             platformFee: 0, 
             status: 'Pending',
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp() as any,
+            updatedAt: serverTimestamp() as any,
         };
 
         if (product.merchantInfo) {
@@ -291,30 +291,15 @@ export default function PublicProductPage() {
     
         if (data.customerPaymentMethod !== 'Cash on Delivery') {
             orderData.customerPaymentStatus = 'Pending';
+            orderData.customerPaymentProof = {
+                senderPhoneNumber: data.senderPhoneNumber,
+                referenceNumber: data.referenceNumber,
+            };
         }
 
         batch.set(dropshipperOrderRef, orderData);
     
         try {
-            if (data.customerPaymentMethod !== 'Cash on Delivery') {
-                const paymentId = doc(collection(firestore, 'id_generator')).id;
-                const paymentDocRef = doc(firestore, `users/${dropshipperId}/payments/${paymentId}`);
-                const amountToPay = totalAmount - ((product.commission || 0) * data.quantity);
-
-                const newPaymentData: Omit<Payment, 'createdAt' | 'updatedAt'> = {
-                    id: paymentId,
-                    orderId: newOrderId,
-                    dropshipperId: dropshipperId,
-                    dropshipperName: dropshipperName,
-                    paymentMethodId: 'customer_direct_payment', // Specific ID for this type of payment
-                    amount: amountToPay,
-                    status: 'Pending',
-                    senderPhoneNumber: data.senderPhoneNumber,
-                    referenceNumber: data.referenceNumber,
-                };
-                batch.set(paymentDocRef, { ...newPaymentData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-            }
-
             // Create a record for the referred customer
             if (dropshipperId) {
                 const customerRef = doc(firestore, `marketingCustomers/${data.customerPhone}`);
@@ -325,7 +310,7 @@ export default function PublicProductPage() {
                     channel: 'web',
                     segment: product.category || 'general',
                     consentStatus: 'pending',
-                    lastInteractionAt: serverTimestamp(),
+                    lastInteractionAt: serverTimestamp() as any,
                     name: data.customerName,
                 };
                  batch.set(customerRef, { ...customerData, createdAt: serverTimestamp() }, { merge: true });

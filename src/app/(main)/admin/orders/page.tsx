@@ -72,16 +72,12 @@ const paymentStatusColorClass: { [key: string]: string } = {
     Verified: 'bg-green-500',
     Pending: 'bg-yellow-500',
     Rejected: 'bg-red-500',
-    Paid: 'bg-green-500',
-    Unpaid: 'bg-gray-400',
 };
 
 const paymentStatusText: { [key: string]: string } = {
     Verified: 'مدفوع',
     Pending: 'قيد المراجعة',
     Rejected: 'مرفوض',
-    Paid: 'عند الاستلام',
-    Unpaid: 'غير مدفوع',
 };
 
 
@@ -611,10 +607,30 @@ export default function AdminOrdersPage() {
                                       </div>
                                     </TableCell>
                                     <TableCell className="py-4">
-                                        <Badge variant="outline" className="flex items-center gap-2 text-xs">
-                                        <span className={cn("h-2 w-2 rounded-full", paymentStatusColorClass[order.customerPaymentMethod === 'Cash on Delivery' ? 'Paid' : 'Unpaid'])} />
-                                        <span>{paymentMethodText[order.customerPaymentMethod] || order.customerPaymentMethod}</span>
-                                        </Badge>
+                                        {order.customerPaymentMethod === 'Cash on Delivery' ? (
+                                            <Badge variant="outline">عند الاستلام</Badge>
+                                        ) : (
+                                            <div className="flex items-center gap-1">
+                                                <Badge variant="outline" className="flex items-center gap-2 text-xs">
+                                                  <span className={cn("h-2 w-2 rounded-full", paymentStatusColorClass[order.customerPaymentStatus || ''] || 'bg-gray-400')} />
+                                                  <span>{paymentStatusText[order.customerPaymentStatus || ''] || order.customerPaymentStatus || 'N/A'}</span>
+                                                </Badge>
+                                                {order.customerPaymentProof && (
+                                                     <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <CheckCircle className="h-4 w-4 text-green-500"/>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <div className="space-y-1 p-1">
+                                                                <p className="font-bold">تم إرفاق إثبات دفع</p>
+                                                                <p>هاتف: {order.customerPaymentProof.senderPhoneNumber}</p>
+                                                                <p>مرجع: {order.customerPaymentProof.referenceNumber}</p>
+                                                            </div>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                )}
+                                            </div>
+                                        )}
                                     </TableCell>
                                     <TableCell className="text-end py-4 font-semibold">{order.totalAmount.toFixed(2)} ج.م</TableCell>
                                     <TableCell className="py-4 text-end no-print">

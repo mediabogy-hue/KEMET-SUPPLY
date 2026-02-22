@@ -1,4 +1,3 @@
-
 import type { Timestamp } from "firebase/firestore";
 
 // This is based on the `Product` entity in `docs/backend.json`
@@ -113,6 +112,10 @@ export interface Order {
   } | null;
   // Customer direct payment status
   customerPaymentStatus?: 'Pending' | 'Verified' | 'Rejected';
+  customerPaymentProof?: {
+    senderPhoneNumber?: string;
+    referenceNumber?: string;
+  };
   // External merchant info
   merchantInfo?: {
     name: string;
@@ -326,4 +329,3 @@ export interface AutomationSettings {
         promoByCategory: boolean;
     };
 }
-    
