@@ -35,7 +35,7 @@ export const getNavLinks = (roles: UserRoles): NavLink[] => {
             { href: "/admin/users", label: "إدارة المستخدمين", icon: React.createElement(Users) },
             { href: "/admin/inquiries", label: "طلبات التجار", icon: React.createElement(Briefcase) },
             { href: "/admin/withdrawals", label: "طلبات السحب", icon: React.createElement(DollarSign) },
-            { href: "/admin/payments", label: "مراجعة الدفعات", icon: React.createElement(Wallet) },
+            { href: "/admin/payments", label: "تأكيد دفعات العملاء", icon: React.createElement(Wallet) },
             { href: "/admin/reports", label: "التقارير", icon: React.createElement(BarChart3) },
             { href: "/admin/marketing", label: "التسويق الآلي", icon: React.createElement(Bot) },
             { href: "/messages", label: "الرسائل", icon: React.createElement(MessageSquare) },
@@ -60,7 +60,7 @@ export const getNavLinks = (roles: UserRoles): NavLink[] => {
 
     if (isFinanceManager) {
         staffLinks.set("/admin/withdrawals", { href: "/admin/withdrawals", label: "طلبات السحب", icon: React.createElement(DollarSign) });
-        staffLinks.set("/admin/payments", { href: "/admin/payments", label: "مراجعة الدفعات", icon: React.createElement(Wallet) });
+        staffLinks.set("/admin/payments", { href: "/admin/payments", label: "تأكيد دفعات العملاء", icon: React.createElement(Wallet) });
     }
 
     // If the user is any kind of staff, give them access to messages and return their specific links

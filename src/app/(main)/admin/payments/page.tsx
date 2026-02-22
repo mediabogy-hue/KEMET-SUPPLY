@@ -13,7 +13,6 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   Dialog,
@@ -24,13 +23,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, updateDoc, serverTimestamp, collectionGroup, query, deleteDoc, writeBatch } from "firebase/firestore";
-import type { Payment } from "@/lib/types";
+import { collection, doc, updateDoc, serverTimestamp, collectionGroup, query, where } from "firebase/firestore";
+import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from '@/auth/SessionProvider';
-import { DeletePaymentAlert } from './_components/delete-payment-alert';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -50,97 +48,66 @@ const statusText: { [key: string]: string } = {
 export default function AdminPaymentsPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const { isAdmin, isFinanceManager, isLoading: isRoleLoading } = useSession();
-  const [paymentToDelete, setPaymentToDelete] = useState<Payment | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [paymentToReject, setPaymentToReject] = useState<Payment | null>(null);
+  const [orderToReject, setOrderToReject] = useState<Order | null>(null);
 
   const canAccess = isAdmin || isFinanceManager;
   
-  const paymentsQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collectionGroup(firestore, 'payments')), [firestore, canAccess, isRoleLoading]);
+  const pendingOrdersQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collectionGroup(firestore, 'orders'), where('customerPaymentStatus', '==', 'Pending')), [firestore, canAccess, isRoleLoading]);
 
-  const { data: allPayments, isLoading: paymentsLoading, error: paymentsError, setData: setAllPayments, lastUpdated } = useCollection<Payment>(paymentsQuery);
+  const { data: allOrders, isLoading: ordersLoading, error: ordersError, setData: setAllOrders, lastUpdated } = useCollection<Order>(pendingOrdersQuery);
 
-  const isLoading = isRoleLoading || paymentsLoading;
-  const error = paymentsError;
+  const isLoading = isRoleLoading || ordersLoading;
+  const error = ordersError;
 
-  const payments = useMemo((): Payment[] => {
-    if (!allPayments) return [];
+  const orders = useMemo((): Order[] => {
+    if (!allOrders) return [];
+    return [...allOrders].sort((a, b) => (a.createdAt?.toDate?.()?.getTime() || 0) - (b.createdAt?.toDate?.()?.getTime() || 0));
+  }, [allOrders]);
+
+  const handleStatusUpdate = (order: Order, newStatus: 'Verified' | 'Rejected', notes?: string) => {
+    if (!firestore || !allOrders) return;
+    const orderRef = doc(firestore, `users/${order.dropshipperId}/orders/${order.id}`);
     
-    const sortedPayments = [...allPayments].sort((a, b) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
-
-    return sortedPayments;
-  }, [allPayments]);
-
-  const handleStatusUpdate = (payment: Payment, newStatus: 'Verified' | 'Rejected', notes?: string) => {
-    if (!firestore || !allPayments) return;
-    const paymentRef = doc(firestore, `users/${payment.dropshipperId}/payments/${payment.id}`);
-    const orderRef = doc(firestore, `users/${payment.dropshipperId}/orders/${payment.orderId}`);
-    
-    const batch = writeBatch(firestore);
-
-    const paymentUpdateData: any = { status: newStatus, updatedAt: serverTimestamp() };
+    const updatedData: any = { customerPaymentStatus: newStatus, updatedAt: serverTimestamp() };
     if (notes) {
-        paymentUpdateData.adminNotes = notes;
+        updatedData.adminNotes = notes;
     }
-    batch.update(paymentRef, paymentUpdateData);
-    batch.update(orderRef, { customerPaymentStatus: newStatus, updatedAt: serverTimestamp() });
 
     // Optimistic UI update
-    setAllPayments(prev => (prev || []).map(p => p.id === payment.id ? { ...p, status: newStatus, adminNotes: notes } : p));
-    toast({ title: "تم تحديث حالة الدفعة" });
+    setAllOrders(prev => (prev || []).filter(o => o.id !== order.id));
+    toast({ title: "تم تحديث حالة الدفع" });
 
-    batch.commit().catch(async (error) => {
+    updateDoc(orderRef, updatedData).catch(async (error) => {
         // Revert UI on error
-        setAllPayments(allPayments);
+        setAllOrders(allOrders);
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `batch write for payment ${payment.id}`,
+            path: orderRef.path,
             operation: 'update',
-            requestResourceData: { status: newStatus },
+            requestResourceData: updatedData,
         }));
         toast({ variant: "destructive", title: "فشل تحديث الحالة", description: "قد لا تملك الصلاحيات الكافية." });
     });
   };
 
   const handleRejectSubmit = () => {
-    if (paymentToReject) {
-      handleStatusUpdate(paymentToReject, 'Rejected', rejectionReason);
-      setPaymentToReject(null);
+    if (orderToReject) {
+      handleStatusUpdate(orderToReject, 'Rejected', rejectionReason);
+      setOrderToReject(null);
       setRejectionReason('');
     }
   }
-
-  const handleDeletePayment = () => {
-    if (!paymentToDelete || !firestore || !allPayments) return;
-    
-    const originalPayments = [...allPayments];
-    setAllPayments(prev => (prev || []).filter(p => p.id !== paymentToDelete.id));
-    toast({ title: "تم حذف سجل الدفع بنجاح" });
-
-    const paymentRef = doc(firestore, `users/${paymentToDelete.dropshipperId}/payments/${paymentToDelete.id}`);
-    
-    deleteDoc(paymentRef)
-        .catch(async (error) => {
-            setAllPayments(originalPayments);
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: paymentRef.path,
-                operation: 'delete',
-            }));
-            toast({ variant: "destructive", title: "فشل حذف سجل الدفع", description: "قد لا تملك الصلاحيات الكافية." });
-        });
-     setPaymentToDelete(null);
-  };
-
 
   return (
     <>
       <Card>
           <CardHeader className="flex flex-row justify-between items-center">
               <div>
-                <CardTitle>مراجعة دفعات الطلبات</CardTitle>
+                <CardTitle>تأكيد دفعات العملاء</CardTitle>
                 <CardDescription>
-                    مراجعة وتأكيد إثباتات الدفع المرسلة من المسوقين لقيمة الطلبات.
+                    مراجعة وتأكيد إثباتات الدفع المقدمة من العملاء للطلبات المدفوعة مسبقاً.
                 </CardDescription>
               </div>
               <RefreshIndicator isLoading={isLoading} lastUpdated={lastUpdated} />
@@ -149,75 +116,47 @@ export default function AdminPaymentsPage() {
               <Table>
                   <TableHeader>
                       <TableRow>
+                          <TableHead>الطلب</TableHead>
                           <TableHead>المسوق</TableHead>
-                          <TableHead>رقم الطلب</TableHead>
                           <TableHead>هاتف الراسل</TableHead>
                           <TableHead>رقم العملية</TableHead>
-                          <TableHead>التاريخ</TableHead>
-                          <TableHead>الحالة</TableHead>
+                          <TableHead>تاريخ الطلب</TableHead>
                           <TableHead className="text-end">المبلغ</TableHead>
-                          <TableHead><span className="sr-only">Actions</span></TableHead>
+                          <TableHead className="text-end">الإجراءات</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {isLoading && Array.from({length: 5}).map((_, i) => (
                            <TableRow key={i}>
-                              <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                               <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                              <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                               <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                               <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                               <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                              <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                               <TableCell className="text-end"><Skeleton className="h-5 w-20 ms-auto" /></TableCell>
-                              <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                              <TableCell><Skeleton className="h-8 w-24 ms-auto" /></TableCell>
                          </TableRow>
                       ))}
-                      {payments.map((payment) => (
-                      <TableRow key={payment.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setSelectedPayment(payment)}>
-                          <TableCell>{payment.dropshipperName || `مسوق غير معروف (${payment.dropshipperId.substring(0,5)})`}</TableCell>
-                          <TableCell className="font-medium">{payment.orderId.substring(0,7).toUpperCase()}</TableCell>
-                          <TableCell className="font-mono">{payment.senderPhoneNumber || 'N/A'}</TableCell>
-                          <TableCell className="font-mono">{payment.referenceNumber || 'N/A'}</TableCell>
-                          <TableCell>{payment.createdAt && typeof payment.createdAt.toDate === 'function' ? format(payment.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
-                          <TableCell>
-                              <Badge variant={statusVariant[payment.status] || 'secondary'}>
-                                  {statusText[payment.status] || payment.status}
-                              </Badge>
-                          </TableCell>
-                          <TableCell className="text-end">{payment.amount.toFixed(2)} ج.م</TableCell>
+                      {orders.map((order) => (
+                      <TableRow key={order.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                          <TableCell className="font-medium">{order.id.substring(0,7).toUpperCase()}</TableCell>
+                          <TableCell>{order.dropshipperName || `مسوق غير معروف (${order.dropshipperId.substring(0,5)})`}</TableCell>
+                          <TableCell className="font-mono">{order.customerPaymentProof?.senderPhoneNumber || 'N/A'}</TableCell>
+                          <TableCell className="font-mono">{order.customerPaymentProof?.referenceNumber || 'N/A'}</TableCell>
+                          <TableCell>{order.createdAt && typeof order.createdAt.toDate === 'function' ? format(order.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
+                          <TableCell className="text-end">{order.totalAmount.toFixed(2)} ج.م</TableCell>
                           <TableCell className="text-end">
-                              <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                  <Button aria-haspopup="true" size="icon" variant="ghost" onClick={(e) => e.stopPropagation()}>
-                                      <MoreHorizontal className="h-4 w-4" />
-                                      <span className="sr-only">Toggle menu</span>
-                                  </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                    {payment.status === 'Pending' && (
-                                        <>
-                                            <DropdownMenuItem onClick={() => handleStatusUpdate(payment, 'Verified')}>تأكيد الدفع</DropdownMenuItem>
-                                            <DropdownMenuItem className="text-destructive" onClick={() => setPaymentToReject(payment)}>رفض الدفع</DropdownMenuItem>
-                                        </>
-                                    )}
-                                    {isAdmin && (
-                                        <>
-                                            {payment.status === 'Pending' && <DropdownMenuSeparator />}
-                                            <DropdownMenuItem className="text-destructive" onClick={() => setPaymentToDelete(payment)}>
-                                                حذف
-                                            </DropdownMenuItem>
-                                        </>
-                                    )}
-                                  </DropdownMenuContent>
-                              </DropdownMenu>
+                              <div className="flex justify-end gap-2">
+                                <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setOrderToReject(order); }}>رفض</Button>
+                                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order, 'Verified'); }}>تأكيد</Button>
+                              </div>
                           </TableCell>
                       </TableRow>
                       ))}
-                       {(!isLoading && payments.length === 0) && (
+                       {(!isLoading && orders.length === 0) && (
                           <TableRow>
-                              <TableCell colSpan={8} className="text-center">
-                                  {error ? "فشل في تحميل دفعات الطلبات." : 'لا توجد دفعات من المسوقين لمراجعتها.'}
+                              <TableCell colSpan={7} className="text-center h-24">
+                                  {error ? "فشل في تحميل الطلبات." : 'لا توجد دفعات من العملاء لمراجعتها حاليًا.'}
                               </TableCell>
                           </TableRow>
                       )}
@@ -225,33 +164,33 @@ export default function AdminPaymentsPage() {
               </Table>
           </CardContent>
       </Card>
-      <Dialog open={!!selectedPayment} onOpenChange={(open) => !open && setSelectedPayment(null)}>
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-                تفاصيل الدفع للطلب #{selectedPayment?.orderId.substring(0, 7).toUpperCase()}
+                تفاصيل الدفع للطلب #{selectedOrder?.id.substring(0, 7).toUpperCase()}
             </DialogTitle>
              <DialogDescription>
-                تم تقديم هذه البيانات بواسطة المسوق لتأكيد الدفع.
+                البيانات المقدمة من العميل لتأكيد الدفع.
             </DialogDescription>
           </DialogHeader>
-          {selectedPayment && (
+          {selectedOrder && (
             <div className="py-4 space-y-4 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">المبلغ:</span><span className="font-bold text-primary">{selectedPayment.amount.toFixed(2)} ج.م</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">حالة الدفع:</span><Badge variant={statusVariant[selectedPayment.status]}>{statusText[selectedPayment.status]}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">هاتف الراسل:</span><span className="font-mono">{selectedPayment.senderPhoneNumber || 'لم يحدد'}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">رقم العملية:</span><span className="font-mono">{selectedPayment.referenceNumber || 'لم يحدد'}</span></div>
-                {selectedPayment.adminNotes && <div className="flex flex-col gap-1 pt-2 border-t"><span className="text-muted-foreground">ملاحظات الأدمن:</span><p className="p-2 bg-muted rounded-md">{selectedPayment.adminNotes}</p></div>}
+                <div className="flex justify-between"><span className="text-muted-foreground">المبلغ:</span><span className="font-bold text-primary">{selectedOrder.totalAmount.toFixed(2)} ج.م</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">حالة الدفع:</span><Badge variant={statusVariant[selectedOrder.customerPaymentStatus || '']}>{statusText[selectedOrder.customerPaymentStatus || '']}</Badge></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">هاتف الراسل:</span><span className="font-mono">{selectedOrder.customerPaymentProof?.senderPhoneNumber || 'لم يحدد'}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">رقم العملية:</span><span className="font-mono">{selectedOrder.customerPaymentProof?.referenceNumber || 'لم يحدد'}</span></div>
+                {selectedOrder.adminNotes && <div className="flex flex-col gap-1 pt-2 border-t"><span className="text-muted-foreground">ملاحظات الأدمن:</span><p className="p-2 bg-muted rounded-md">{selectedOrder.adminNotes}</p></div>}
             </div>
           )}
         </DialogContent>
       </Dialog>
-       <Dialog open={!!paymentToReject} onOpenChange={(isOpen) => !isOpen && setPaymentToReject(null)}>
+       <Dialog open={!!orderToReject} onOpenChange={(isOpen) => !isOpen && setOrderToReject(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>رفض إثبات الدفع</DialogTitle>
             <CardDescription>
-              الرجاء كتابة سبب الرفض ليظهر للمسوق.
+              الرجاء كتابة سبب الرفض ليظهر للمسوق والعميل.
             </CardDescription>
           </DialogHeader>
           <div className="py-4">
@@ -264,17 +203,11 @@ export default function AdminPaymentsPage() {
             />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setPaymentToReject(null)}>إلغاء</Button>
+            <Button variant="ghost" onClick={() => setOrderToReject(null)}>إلغاء</Button>
             <Button variant="destructive" onClick={handleRejectSubmit}>تأكيد الرفض</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <DeletePaymentAlert
-        payment={paymentToDelete}
-        isOpen={!!paymentToDelete}
-        onOpenChange={(isOpen) => !isOpen && setPaymentToDelete(null)}
-        onConfirm={handleDeletePayment}
-      />
     </>
   );
 }

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -9,11 +10,10 @@ import { File, Eye } from "lucide-react";
 import Link from "next/link";
 import { useCollection, useFirestore, useUser, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy } from "firebase/firestore";
-import type { Order, Payment } from "@/lib/types";
+import type { Order } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from 'date-fns';
 import { useState, useMemo } from "react";
-import { PaymentDialog } from "./_components/payment-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { exportToExcel } from '@/lib/export';
 import { cn } from "@/lib/utils";
@@ -75,12 +75,6 @@ export default function OrdersPage() {
   const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState("all");
 
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
-  
-  const [proofToShow, setProofToShow] = useState<Payment | null>(null);
-  const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
-
   const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(
@@ -88,24 +82,7 @@ export default function OrdersPage() {
     );
   }, [firestore, user]);
 
-  const { data: orders, isLoading: ordersLoading, setData: setOrders } = useCollection<Order>(ordersQuery);
-
-  const paymentsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, `users/${user.uid}/payments`);
-  }, [firestore, user]);
-
-  const { data: payments, isLoading: paymentsLoading } = useCollection<Payment>(paymentsQuery);
-  
-  const paymentByOrderId = useMemo(() => {
-    const map = new Map<string, Payment>();
-    if (payments) {
-      for (const p of payments) {
-        map.set(p.orderId, p);
-      }
-    }
-    return map;
-  }, [payments]);
+  const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -121,16 +98,15 @@ export default function OrdersPage() {
       if (!filteredOrders) return;
 
       const dataToExport = filteredOrders.map(order => {
-          const payment = paymentByOrderId.get(order.id);
           const isCod = order.customerPaymentMethod === 'Cash on Delivery';
 
           let paymentStatus = 'N/A';
           if (isCod) {
               paymentStatus = 'عند الاستلام';
-          } else if (payment) {
-              paymentStatus = paymentStatusText[payment.status] || payment.status;
+          } else if (order.customerPaymentStatus) {
+              paymentStatus = paymentStatusText[order.customerPaymentStatus] || order.customerPaymentStatus;
           } else {
-              paymentStatus = 'غير مدفوع';
+              paymentStatus = 'في انتظار الدفع';
           }
 
           return {
@@ -162,20 +138,7 @@ export default function OrdersPage() {
   }
 
 
-  const isLoading = ordersLoading || paymentsLoading;
-  
-  const handlePaymentSuccess = (orderId: string) => {
-    // This function will be called from the PaymentDialog on successful upload
-    // to optimistically update the UI.
-    if(setOrders) {
-        setOrders(prevOrders => {
-            if (!prevOrders) return null;
-            return prevOrders.map(o => 
-                o.id === orderId ? { ...o, customerPaymentStatus: 'Pending' } : o
-            );
-        });
-    }
-  }
+  const isLoading = ordersLoading;
 
   return (
     <>
@@ -220,7 +183,6 @@ export default function OrdersPage() {
                               <TableHead>حالة الطلب</TableHead>
                               <TableHead>حالة الدفع</TableHead>
                               <TableHead className="text-end">الإجمالي</TableHead>
-                              <TableHead className="text-end">الإجراءات</TableHead>
                           </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -233,13 +195,10 @@ export default function OrdersPage() {
                                <TableCell className="py-4"><Skeleton className="h-6 w-20" /></TableCell>
                                <TableCell className="py-4"><Skeleton className="h-6 w-20" /></TableCell>
                                <TableCell className="text-end py-4"><Skeleton className="h-5 w-20 ms-auto" /></TableCell>
-                               <TableCell className="text-end py-4"><Skeleton className="h-8 w-12 ms-auto" /></TableCell>
                              </TableRow>
                           ))}
                           {filteredOrders?.map((order) => {
-                            const payment = paymentByOrderId.get(order.id);
                             const isCod = order.customerPaymentMethod === 'Cash on Delivery';
-                            const canPay = !isCod && (!payment || payment.status === 'Rejected') && (order.status === 'Pending' || order.status === 'Confirmed');
 
                             return (
                               <TableRow key={order.id} className="hover:bg-muted/50">
@@ -258,36 +217,21 @@ export default function OrdersPage() {
                                   <TableCell className="py-4">
                                     {isCod ? (
                                         <Badge variant="outline">عند الاستلام</Badge>
-                                    ) : payment ? (
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={paymentStatusVariant[payment.status] || 'secondary'}>
-                                                {paymentStatusText[payment.status] || payment.status}
-                                            </Badge>
-                                            {payment.proof && (
-                                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setProofToShow(payment); setIsProofDialogOpen(true); }}>
-                                                  <Eye className="h-4 w-4" />
-                                                  <span className="sr-only">عرض الإثبات</span>
-                                              </Button>
-                                            )}
-                                        </div>
+                                    ) : order.customerPaymentStatus ? (
+                                        <Badge variant={paymentStatusVariant[order.customerPaymentStatus] || 'secondary'}>
+                                            {paymentStatusText[order.customerPaymentStatus] || order.customerPaymentStatus}
+                                        </Badge>
                                     ) : (
-                                        <Badge variant="destructive">غير مدفوع</Badge>
+                                        <Badge variant="destructive">في انتظار الدفع</Badge>
                                     )}
                                   </TableCell>
                                   <TableCell className="text-end py-4">{order.totalAmount.toFixed(2)} ج.م</TableCell>
-                                  <TableCell className="text-end py-4">
-                                      {canPay && (
-                                          <Button variant="outline" size="sm" onClick={() => { setSelectedOrder(order); setIsPaymentDialogOpen(true); }}>
-                                              إرسال إثبات الدفع
-                                          </Button>
-                                      )}
-                                  </TableCell>
                               </TableRow>
                             );
                           })}
                           {(!isLoading && (!filteredOrders || filteredOrders.length === 0)) && (
                               <TableRow>
-                                  <TableCell colSpan={9} className="h-24 text-center">ليس لديك أي طلبات في هذه الفئة.</TableCell>
+                                  <TableCell colSpan={7} className="h-24 text-center">ليس لديك أي طلبات في هذه الفئة.</TableCell>
                               </TableRow>
                           )}
                       </TableBody>
@@ -296,27 +240,6 @@ export default function OrdersPage() {
           </Card>
         </TabsContent>
       </Tabs>
-      <PaymentDialog 
-        order={selectedOrder}
-        isOpen={isPaymentDialogOpen}
-        onOpenChange={setIsPaymentDialogOpen}
-        onPaymentSuccess={handlePaymentSuccess}
-      />
-       <Dialog open={isProofDialogOpen} onOpenChange={setIsProofDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-                <DialogTitle>إثبات الدفع للطلب #{proofToShow?.orderId.substring(0, 7).toUpperCase()}</DialogTitle>
-                <DialogDescription>
-                    هذه هي صورة إثبات الدفع التي قمت برفعها.
-                </DialogDescription>
-            </DialogHeader>
-            {proofToShow?.proof?.url && (
-                <div className="py-4">
-                    <img src={proofToShow.proof.url} alt={`إثبات الدفع للطلب ${proofToShow.orderId}`} className="max-h-[60vh] w-auto mx-auto rounded-md" />
-                </div>
-            )}
-        </DialogContent>
-    </Dialog>
     </>
   );
 }

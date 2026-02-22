@@ -1,3 +1,4 @@
+
 import type { Timestamp } from "firebase/firestore";
 
 // This is based on the `Product` entity in `docs/backend.json`
@@ -122,6 +123,7 @@ export interface Order {
     phone: string;
     whatsapp: string;
   };
+  adminNotes?: string;
 }
 
 export interface Shipment {
