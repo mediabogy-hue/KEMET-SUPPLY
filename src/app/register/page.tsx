@@ -316,6 +316,19 @@ export default function RegisterPage() {
         </div>
       </section>
 
+      {/* Merchant Section */}
+      <section className="py-16 md:py-24 bg-background">
+        <div className="container mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold tracking-tight">هل أنت تاجر أو مورد؟</h2>
+          <p className="mt-4 max-w-2xl mx-auto text-lg text-muted-foreground">
+            هل لديك منتجات وترغب في الوصول إلى آلاف المسوقين النشطين؟ انضم إلى شبكة موردينا وقم بزيادة مبيعاتك وأرباحك دون عناء.
+          </p>
+          <div className="mt-8">
+            <MerchantInquiryDialog />
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-background border-t">
           <div className="container mx-auto px-6 py-6 text-center text-muted-foreground">
@@ -325,5 +338,3 @@ export default function RegisterPage() {
     </div>
   );
 }
-
-    
