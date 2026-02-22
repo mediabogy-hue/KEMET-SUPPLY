@@ -214,8 +214,9 @@ service cloud.firestore {
     // Marketing Automation Collections
     match /marketingCustomers/{customerId} {
       allow read, write: if isAdmin();
-      // Allow creation during checkout if a referral exists
-      allow create: if isAdmin() || (request.auth == null && request.resource.data.referralMarketerId != null);
+      // Allow creation or update during checkout if a referral exists.
+      // This is to allow set({ merge: true }) to work for both new and returning customers.
+      allow create, update: if isAdmin() || (request.auth == null && request.resource.data.referralMarketerId != null);
     }
     match /marketingCampaigns/{campaignId} {
       allow read, write: if isAdmin();
