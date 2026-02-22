@@ -88,6 +88,9 @@ export default function ProfilePage() {
     const { toast } = useToast();
     const { isDropshipper, isStaff, isLoading: isRoleLoading, profile: userProfile } = useSession();
 
+    const [isClient, setIsClient] = useState(false);
+    useEffect(() => { setIsClient(true); }, []);
+
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !authUser) return null;
         return query(collection(firestore, `users/${authUser.uid}/orders`));
@@ -178,7 +181,7 @@ export default function ProfilePage() {
             });
     };
 
-    const isLoading = isUserLoading || isRoleLoading || ordersLoading;
+    const isLoading = !isClient || isUserLoading || isRoleLoading || ordersLoading;
     const paymentCardVisible = isDropshipper || isStaff;
     const paymentDescription = isDropshipper 
         ? "إدارة معلومات حساباتك لاستلام الأرباح."
@@ -257,7 +260,3 @@ export default function ProfilePage() {
         </div>
     );
 }
-
-    
-
-    

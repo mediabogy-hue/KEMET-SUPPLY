@@ -1,3 +1,4 @@
+
 'use client';
 import dynamic from 'next/dynamic';
 import {
@@ -79,6 +80,11 @@ const ProductPerformanceTable = ({ title, products, icon }: { title: string, pro
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
     const { isAdmin, isLoading: isSessionLoading } = useSession();
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const canAccess = !isSessionLoading && isAdmin;
     
@@ -95,7 +101,7 @@ export default function AdminDashboardPage() {
     const { data: users, isLoading: usersLoading, lastUpdated: usersLastUpdated } = useCollection<UserProfile>(usersQuery);
     const { data: products, isLoading: productsLoading, lastUpdated: productsLastUpdated } = useCollection<Product>(productsQuery);
 
-    const isLoading = isSessionLoading || usersLoading || ordersLoading || productsLoading;
+    const isLoading = !isClient || isSessionLoading || usersLoading || ordersLoading || productsLoading;
     const queryError = ordersError;
 
     const lastUpdated = useMemo(() => {
