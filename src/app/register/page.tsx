@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -24,6 +23,33 @@ import { Rocket } from 'lucide-react';
 import { MerchantInquiryDialog } from './_components/merchant-inquiry-dialog';
 import { useSession } from '@/auth/SessionProvider';
 import { getDefaultPath } from '@/auth/permissions';
+
+
+// --- SVG Decorative Icons ---
+const AnkhIcon = ({ className }: { className?: string }) => (
+  <svg className={className} width="60" height="108" viewBox="0 0 60 108" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M30 38.625V108" stroke="currentColor" strokeWidth="6"/>
+      <path d="M0 54H60" stroke="currentColor" strokeWidth="6"/>
+      <circle cx="30" cy="19.5" r="15.5" stroke="currentColor" strokeWidth="6"/>
+  </svg>
+);
+
+const PyramidIcon = ({ className }: { className?: string }) => (
+    <svg className={className} width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M60 0L0 80H120L60 0Z" stroke="currentColor" strokeWidth="4" />
+        <path d="M60 0V80" stroke="currentColor" strokeWidth="1" strokeDasharray="3 3"/>
+    </svg>
+);
+
+const EyeOfHorusIcon = ({ className }: { className?: string }) => (
+    <svg className={className} width="100" height="70" viewBox="0 0 100 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M3 35C15 20 40 15 50 35C60 15 85 20 97 35" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M3 35C15 50 40 55 50 35C60 55 85 50 97 35" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <circle cx="50" cy="35" r="8" stroke="currentColor" strokeWidth="3" fill="transparent"/>
+        <path d="M70 35C70 43.8399 61.0457 51 50 51" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M55 52L48 68" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
+    </svg>
+);
 
 
 export default function RegisterPage() {
@@ -194,6 +220,14 @@ export default function RegisterPage() {
       <section className="relative flex flex-col items-center justify-center text-center min-h-screen p-8 bg-background overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern z-0"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-1"></div>
+
+        {/* Decorative SVG Icons */}
+        <AnkhIcon className="absolute top-[20%] left-[5%] text-primary/5 -rotate-12 hidden lg:block" />
+        <PyramidIcon className="absolute bottom-[10%] right-[5%] text-primary/5 hidden md:block" />
+        <EyeOfHorusIcon className="absolute top-[25%] right-[10%] text-primary/5 rotate-12 hidden lg:block" />
+        <AnkhIcon className="absolute bottom-[15%] left-[15%] text-primary/5 rotate-6 hidden md:block w-12 h-auto" />
+
+
         <div className="z-10 flex flex-col items-center">
             <Logo />
             <h1 className="mt-8 text-4xl md:text-6xl font-bold tracking-tight bg-gradient-to-br from-primary to-amber-300 bg-clip-text text-transparent drop-shadow-sm">
