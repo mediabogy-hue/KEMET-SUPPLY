@@ -110,6 +110,14 @@ service cloud.firestore {
         allow read: if isOwner(userId) || isAdmin();
         allow write: if false;
       }
+      
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        // User can only update the 'isRead' field to mark a notification as read.
+        allow update: if isOwner(userId) && request.writeFields.hasOnly(['isRead']);
+        // Staff can create/delete notifications for users.
+        allow create, delete: if isStaff();
+      }
     }
     
     // --- Collection Group Queries ---

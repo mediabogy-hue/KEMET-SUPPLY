@@ -208,6 +208,18 @@ export default function AdminOrdersPage() {
 
     const dropshipperOrderRef = doc(firestore, `users/${order.dropshipperId}/orders/${order.id}`);
 
+    const notificationRef = doc(collection(firestore, `users/${order.dropshipperId}/notifications`));
+    const notificationData = {
+        id: notificationRef.id,
+        userId: order.dropshipperId,
+        title: `تحديث حالة الطلب #${order.id.substring(0, 7).toUpperCase()}`,
+        description: `تم تحديث حالة طلبك إلى "${statusText[newStatus] || newStatus}".`,
+        type: 'order_status_update' as const,
+        isRead: false,
+        link: '/orders',
+        createdAt: serverTimestamp(),
+    };
+
     try {
         if (newStatus === 'Confirmed') {
             if (order.status !== 'Pending') {
@@ -253,6 +265,7 @@ export default function AdminOrdersPage() {
                     confirmedBy: { userId: user.uid, role: role },
                     stockApplied: true, stockAppliedAt: serverTimestamp(), stockError: null,
                 });
+                transaction.set(notificationRef, notificationData);
             });
             toast({ title: "تم تأكيد الطلب وخصم المخزون بنجاح!" });
         } else if (newStatus === 'Canceled' || newStatus === 'Returned') {
@@ -281,10 +294,14 @@ export default function AdminOrdersPage() {
                 } else {
                     transaction.update(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
                 }
+                 transaction.set(notificationRef, notificationData);
             });
             toast({ title: `تم تحديث حالة الطلب إلى "${statusText[newStatus]}"` });
         } else {
-            await updateDoc(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
+            const batch = writeBatch(firestore);
+            batch.update(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
+            batch.set(notificationRef, notificationData);
+            await batch.commit();
             toast({ title: "تم تحديث حالة الطلب بنجاح" });
         }
 
@@ -576,6 +593,7 @@ export default function AdminOrdersPage() {
                                             <div className="text-xs text-muted-foreground">{
                                                 (() => {
                                                     const seconds = Math.floor((new Date().getTime() - orderDate.getTime()) / 1000);
+                                                    if (seconds < 5) return 'الآن';
                                                     if (seconds < 60) return 'الآن';
                                                     if (seconds < 3600) return `منذ ${Math.floor(seconds / 60)} د`;
                                                     if (seconds < 86400) return `منذ ${Math.floor(seconds / 3600)} س`;

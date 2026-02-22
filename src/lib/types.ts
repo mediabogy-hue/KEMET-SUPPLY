@@ -219,6 +219,17 @@ export interface AuditLog {
     // For display
     userName?: string; 
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  type: 'order_status_update' | 'payment_verified' | 'new_bonus' | 'new_message' | 'general_announcement';
+  isRead: boolean;
+  link?: string;
+  createdAt: Timestamp;
+}
     
 export interface Conversation {
   id: string;
