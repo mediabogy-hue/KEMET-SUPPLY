@@ -76,8 +76,8 @@ service cloud.firestore {
         allow get, list: if isOwner(userId) || isStaff();
         // A logged-in user can create their own order. Staff can create on behalf of users. An unauthenticated user can create an order via a referral link.
         allow create: if isOwner(userId) || isStaff() || (request.auth == null && request.resource.data.dropshipperId != null);
-        // Admins/OrdersManagers can update orders. A dropshipper can only update the payment status of their own order.
-        allow update: if (isAdmin() || isOrdersManager()) || (isOwner(userId) && dropshipperIsUpdatingPaymentStatus());
+        // Admins, OrdersManagers, and FinanceManagers can update orders. A dropshipper can only update the payment status of their own order.
+        allow update: if (isAdmin() || isOrdersManager() || isFinanceManager()) || (isOwner(userId) && dropshipperIsUpdatingPaymentStatus());
         // Only Admins can delete orders.
         allow delete: if isAdmin();
       }
