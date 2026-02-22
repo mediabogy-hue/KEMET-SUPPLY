@@ -191,7 +191,7 @@ export default function AdminOrdersPage() {
   
   const summaryStats = useMemo(() => {
     if (!orders) return { revenueToday: 0, ordersToday: 0 };
-    const todaysLoadedOrders = orders.filter(o => o.createdAt && isToday(o.createdAt.toDate()));
+    const todaysLoadedOrders = orders.filter(o => o.createdAt && typeof o.createdAt.toDate === 'function' && isToday(o.createdAt.toDate()));
     const revenueToday = todaysLoadedOrders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + o.totalAmount, 0);
     return {
         revenueToday: revenueToday,
@@ -207,18 +207,6 @@ export default function AdminOrdersPage() {
     toast({ title: "جاري تحديث حالة الطلب..." });
 
     const dropshipperOrderRef = doc(firestore, `users/${order.dropshipperId}/orders/${order.id}`);
-
-    const notificationRef = doc(collection(firestore, `users/${order.dropshipperId}/notifications`));
-    const notificationData = {
-        id: notificationRef.id,
-        userId: order.dropshipperId,
-        title: `تحديث حالة الطلب #${order.id.substring(0, 7).toUpperCase()}`,
-        description: `تم تحديث حالة طلبك إلى "${statusText[newStatus] || newStatus}".`,
-        type: 'order_status_update' as const,
-        isRead: false,
-        link: '/orders',
-        createdAt: serverTimestamp(),
-    };
 
     try {
         if (newStatus === 'Confirmed') {
@@ -265,7 +253,6 @@ export default function AdminOrdersPage() {
                     confirmedBy: { userId: user.uid, role: role },
                     stockApplied: true, stockAppliedAt: serverTimestamp(), stockError: null,
                 });
-                transaction.set(notificationRef, notificationData);
             });
             toast({ title: "تم تأكيد الطلب وخصم المخزون بنجاح!" });
         } else if (newStatus === 'Canceled' || newStatus === 'Returned') {
@@ -294,14 +281,10 @@ export default function AdminOrdersPage() {
                 } else {
                     transaction.update(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
                 }
-                 transaction.set(notificationRef, notificationData);
             });
             toast({ title: `تم تحديث حالة الطلب إلى "${statusText[newStatus]}"` });
         } else {
-            const batch = writeBatch(firestore);
-            batch.update(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
-            batch.set(notificationRef, notificationData);
-            await batch.commit();
+            await updateDoc(dropshipperOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
             toast({ title: "تم تحديث حالة الطلب بنجاح" });
         }
 
@@ -543,7 +526,7 @@ export default function AdminOrdersPage() {
                            </TableRow>
                         ))}
                         {filteredOrders.map((order) => {
-                            const orderDate = order.createdAt.toDate();
+                            const orderDate = order.createdAt && typeof order.createdAt.toDate === 'function' ? order.createdAt.toDate() : new Date();
                             
                             const existingShipment = shipmentsMap.get(order.id);
 
@@ -588,20 +571,25 @@ export default function AdminOrdersPage() {
                                     </TableCell>
                                     <TableCell className="py-4">{order.dropshipperName || `مسوق غير معروف (${order.dropshipperId.substring(0,5)})`}</TableCell>
                                     <TableCell className="py-4">
-                                        <div className="font-medium">{format(orderDate, 'yyyy/MM/dd')}</div>
                                         {clientRendered ? (
-                                            <div className="text-xs text-muted-foreground">{
-                                                (() => {
-                                                    const seconds = Math.floor((new Date().getTime() - orderDate.getTime()) / 1000);
-                                                    if (seconds < 5) return 'الآن';
-                                                    if (seconds < 60) return 'الآن';
-                                                    if (seconds < 3600) return `منذ ${Math.floor(seconds / 60)} د`;
-                                                    if (seconds < 86400) return `منذ ${Math.floor(seconds / 3600)} س`;
-                                                    return `منذ ${Math.floor(seconds / 86400)} ي`;
-                                                })()
-                                            }</div>
+                                            <>
+                                                <div className="font-medium">{format(orderDate, 'yyyy/MM/dd')}</div>
+                                                <div className="text-xs text-muted-foreground">{
+                                                    (() => {
+                                                        const seconds = Math.floor((new Date().getTime() - orderDate.getTime()) / 1000);
+                                                        if (seconds < 5) return 'الآن';
+                                                        if (seconds < 60) return 'الآن';
+                                                        if (seconds < 3600) return `منذ ${Math.floor(seconds / 60)} د`;
+                                                        if (seconds < 86400) return `منذ ${Math.floor(seconds / 3600)} س`;
+                                                        return `منذ ${Math.floor(seconds / 86400)} ي`;
+                                                    })()
+                                                }</div>
+                                            </>
                                         ) : (
-                                            <Skeleton className="h-4 w-16 mt-1" />
+                                            <>
+                                                <Skeleton className="h-5 w-20" />
+                                                <Skeleton className="h-4 w-16 mt-1" />
+                                            </>
                                         )}
                                     </TableCell>
                                     <TableCell className="py-4">
