@@ -5,6 +5,7 @@ import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { PwaFeatures } from '@/components/pwa-features';
 import { SessionProvider } from '@/auth/SessionProvider';
+import { RoleGuard } from '@/auth/RoleGuard';
 
 export const metadata: Metadata = {
   title: {
@@ -38,7 +39,9 @@ export default function RootLayout({
       <body className="font-body antialiased">
         <FirebaseClientProvider>
           <SessionProvider>
-            {children}
+            <RoleGuard>
+              {children}
+            </RoleGuard>
             <PwaFeatures />
           </SessionProvider>
         </FirebaseClientProvider>
