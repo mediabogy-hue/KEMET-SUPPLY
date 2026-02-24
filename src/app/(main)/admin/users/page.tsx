@@ -16,7 +16,7 @@ import { EditUserDialog } from "./_components/edit-user-dialog";
 import { DeleteUserAlert } from "./_components/delete-user-alert";
 import { SetTargetDialog } from "./_components/set-target-dialog";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, doc, updateDoc, deleteDoc, writeBatch } from "firebase/firestore";
+import { collection, query, doc, updateDoc, deleteDoc, writeBatch, Timestamp } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +44,41 @@ const levelColor: Record<string, string> = {
     'Platinum Partner': 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20'
 };
 
+const OnlineStatus = ({ lastSeen }: { lastSeen?: Timestamp }) => {
+    const [isOnline, setIsOnline] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        if (!lastSeen) {
+            setIsOnline(false);
+            return;
+        }
+
+        const updateStatus = () => {
+            const isCurrentlyOnline = lastSeen.toDate() > new Date(Date.now() - 5 * 60 * 1000);
+            setIsOnline(isCurrentlyOnline);
+        };
+
+        updateStatus();
+        const intervalId = setInterval(updateStatus, 60000); // Check every minute
+
+        return () => clearInterval(intervalId);
+    }, [lastSeen]);
+
+    if (isOnline === null) {
+        return <Skeleton className="h-5 w-20" />;
+    }
+
+    return (
+        <div className="flex items-center gap-2 font-semibold">
+            {isOnline
+                ? <><Wifi className="h-4 w-4 text-green-500" /><span>متصل</span></>
+                : <><WifiOff className="h-4 w-4 text-red-500" /><span>غير متصل</span></>
+            }
+        </div>
+    );
+};
+
+
 export default function AdminUsersPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -54,11 +89,6 @@ export default function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [userToSetTarget, setUserToSetTarget] = useState<UserProfile | null>(null);
   const [userToGrantBonus, setUserToGrantBonus] = useState<UserProfile | null>(null);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const canAccess = !isRoleLoading && isAdmin;
 
@@ -166,16 +196,7 @@ export default function AdminUsersPage() {
                        <CardContent className="p-6 pt-0 flex-grow">
                             <div className="flex items-center justify-between text-base p-3 rounded-lg bg-muted/50">
                                 <span className="text-muted-foreground">حالة الاتصال</span>
-                                {isClient ? (
-                                    <div className="flex items-center gap-2 font-semibold">
-                                        {(profile.lastSeen && profile.lastSeen.toDate() > new Date(Date.now() - 5 * 60 * 1000))
-                                            ? <><Wifi className="h-4 w-4 text-green-500" /><span>متصل</span></>
-                                            : <><WifiOff className="h-4 w-4 text-red-500" /><span>غير متصل</span></>
-                                        }
-                                    </div>
-                                ) : (
-                                    <Skeleton className="h-5 w-20" />
-                                )}
+                                <OnlineStatus lastSeen={profile.lastSeen} />
                             </div>
                        </CardContent>
                        <CardFooter className="p-6 pt-0">
@@ -257,16 +278,7 @@ export default function AdminUsersPage() {
                             </div>
                             <div className="flex items-center justify-between text-base p-4 rounded-lg bg-muted/50">
                                 <span className="text-muted-foreground">حالة الاتصال</span>
-                                {isClient ? (
-                                    <div className="flex items-center gap-2 font-semibold">
-                                        {(profile.lastSeen && profile.lastSeen.toDate() > new Date(Date.now() - 5 * 60 * 1000))
-                                            ? <><Wifi className="h-4 w-4 text-green-500" /><span>متصل</span></>
-                                            : <><WifiOff className="h-4 w-4 text-red-500" /><span>غير متصل</span></>
-                                        }
-                                    </div>
-                                ) : (
-                                    <Skeleton className="h-5 w-20" />
-                                )}
+                                <OnlineStatus lastSeen={profile.lastSeen} />
                             </div>
                         </CardContent>
                     </Card>

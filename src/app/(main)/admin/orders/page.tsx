@@ -95,6 +95,32 @@ const StatCard = ({ title, value, icon, isLoading }: { title: string, value: str
     </Card>
 );
 
+const ClientRelativeTime = ({ date }: { date?: Date }) => {
+    const [timeAgo, setTimeAgo] = useState<string>('');
+
+    useEffect(() => {
+        if (!date) return;
+
+        const update = () => {
+            const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+            if (seconds < 5) setTimeAgo('الآن');
+            else if (seconds < 60) setTimeAgo(`منذ ${Math.floor(seconds)} ث`);
+            else if (seconds < 3600) setTimeAgo(`منذ ${Math.floor(seconds / 60)} د`);
+            else if (seconds < 86400) setTimeAgo(`منذ ${Math.floor(seconds / 3600)} س`);
+            else setTimeAgo(`منذ ${Math.floor(seconds / 86400)} ي`);
+        };
+        
+        update();
+        const intervalId = setInterval(update, 60000); // Update every minute
+        return () => clearInterval(intervalId);
+    }, [date]);
+
+    if (!date) return null;
+    if (!timeAgo) return <Skeleton className="h-4 w-16 mt-1" />; // Placeholder during calculation
+    
+    return <>{timeAgo}</>;
+};
+
 export default function AdminOrdersPage() {
   const { user, firestore } = useFirebase();
   const router = useRouter();
@@ -109,10 +135,10 @@ export default function AdminOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [marketerFilter, setMarketerFilter] = useState('all');
   const [paymentFilter, setPaymentFilter] = useState('all');
-  const [clientRendered, setClientRendered] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setClientRendered(true);
+    setIsClient(true);
   }, []);
 
   const canAccess = isAdmin || isOrdersManager;
@@ -173,14 +199,14 @@ export default function AdminOrdersPage() {
   }, [searchTerm, statusFilter, marketerFilter, paymentFilter]);
   
   const summaryStats = useMemo(() => {
-    if (!allOrders || !clientRendered) return { revenueToday: 0, ordersToday: 0 };
+    if (!allOrders || !isClient) return { revenueToday: 0, ordersToday: 0 };
     const todaysLoadedOrders = allOrders.filter(o => o.createdAt && typeof o.createdAt.toDate === 'function' && isToday(o.createdAt.toDate()));
     const revenueToday = todaysLoadedOrders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + o.totalAmount, 0);
     return {
         revenueToday: revenueToday,
         ordersToday: todaysLoadedOrders.length,
     }
-  }, [allOrders, clientRendered]);
+  }, [allOrders, isClient]);
 
   const handleStatusUpdate = useCallback(async (order: Order, newStatus: string) => {
     if (!firestore || !user || !role || !profile || !allOrders) return;
@@ -507,9 +533,8 @@ export default function AdminOrdersPage() {
                                 <TableCell className="py-4 text-end"><Skeleton className="h-8 w-8 ms-auto" /></TableCell>
                            </TableRow>
                         ))}
-                        {clientRendered && filteredOrders.map((order) => {
-                            const orderDate = order.createdAt && typeof order.createdAt.toDate === 'function' ? order.createdAt.toDate() : new Date();
-                            
+                        {filteredOrders.map((order) => {
+                            const orderDate = order.createdAt?.toDate();
                             const existingShipment = shipmentsMap.get(order.id);
 
                             return (
@@ -553,21 +578,10 @@ export default function AdminOrdersPage() {
                                     </TableCell>
                                     <TableCell className="py-4">{order.dropshipperName || `مسوق غير معروف (${order.dropshipperId.substring(0,5)})`}</TableCell>
                                     <TableCell className="py-4">
-                                        
-                                        <>
-                                            <div className="font-medium">{format(orderDate, 'yyyy/MM/dd')}</div>
-                                            <div className="text-xs text-muted-foreground">{
-                                                (() => {
-                                                    const seconds = Math.floor((new Date().getTime() - orderDate.getTime()) / 1000);
-                                                    if (seconds < 5) return 'الآن';
-                                                    if (seconds < 60) return 'الآن';
-                                                    if (seconds < 3600) return `منذ ${Math.floor(seconds / 60)} د`;
-                                                    if (seconds < 86400) return `منذ ${Math.floor(seconds / 3600)} س`;
-                                                    return `منذ ${Math.floor(seconds / 86400)} ي`;
-                                                })()
-                                            }</div>
-                                        </>
-                                        
+                                        <div className="font-medium">{orderDate ? format(orderDate, 'yyyy/MM/dd') : 'N/A'}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            <ClientRelativeTime date={orderDate} />
+                                        </div>
                                     </TableCell>
                                     <TableCell className="py-4">
                                       <div className="flex items-center gap-1">
@@ -720,3 +734,4 @@ export default function AdminOrdersPage() {
     </TooltipProvider>
   );
 }
+

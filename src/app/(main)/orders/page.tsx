@@ -74,12 +74,6 @@ export default function OrdersPage() {
   const { user } = useUser();
   const firestore = useFirestore();
   const [activeTab, setActiveTab] = useState("all");
-  const [clientRendered, setClientRendered] = useState(false);
-
-  useEffect(() => {
-    setClientRendered(true);
-  }, []);
-
 
   const ordersQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -203,7 +197,7 @@ export default function OrdersPage() {
                                <TableCell className="text-end py-4"><Skeleton className="h-5 w-20 ms-auto" /></TableCell>
                              </TableRow>
                           ))}
-                          {clientRendered && filteredOrders?.map((order) => {
+                          {filteredOrders?.map((order) => {
                             const isCod = order.customerPaymentMethod === 'Cash on Delivery';
 
                             return (

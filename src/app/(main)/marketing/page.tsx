@@ -77,6 +77,24 @@ const consentStatusVariant: { [key: string]: "default" | "secondary" | "destruct
   denied: "destructive",
 };
 
+const ClientFormatDistance = ({ date }: { date?: Date }) => {
+    const [formatted, setFormatted] = useState<string | null>(null);
+    useEffect(() => {
+        if (date) {
+            const update = () => setFormatted(formatDistanceToNow(date, { addSuffix: true, locale: ar }));
+            update();
+            const interval = setInterval(update, 60000);
+            return () => clearInterval(interval);
+        }
+    }, [date]);
+
+    if (!formatted) {
+        return <Skeleton className="h-4 w-24" />;
+    }
+    return <>{formatted}</>;
+}
+
+
 function MarketingDashboardTab({ customers, isLoading }: { customers: ReferredCustomer[] | null, isLoading: boolean }) {
     const stats = useMemo(() => {
         const leadsCount = customers?.length ?? 0;
@@ -104,11 +122,6 @@ function MarketingDashboardTab({ customers, isLoading }: { customers: ReferredCu
 function CustomersTab({ customers, marketers, isLoading }: { customers: ReferredCustomer[] | null, marketers: UserProfile[] | null, isLoading: boolean }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
-    const [clientRendered, setClientRendered] = useState(false);
-
-    useEffect(() => {
-      setClientRendered(true);
-    }, []);
 
     const marketersMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -172,10 +185,10 @@ function CustomersTab({ customers, marketers, isLoading }: { customers: Referred
                                 <TableCell><Badge variant="outline">{customer.segment}</Badge></TableCell>
                                 <TableCell>{customer.channel}</TableCell>
                                 <TableCell>
-                                  {clientRendered && customer.lastInteractionAt ? (
-                                      formatDistanceToNow(customer.lastInteractionAt.toDate(), { addSuffix: true, locale: ar })
+                                  {customer.lastInteractionAt ? (
+                                    <ClientFormatDistance date={customer.lastInteractionAt.toDate()} />
                                   ) : (
-                                      <Skeleton className="h-4 w-24" />
+                                    'N/A'
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -596,3 +609,5 @@ export default function MarketingPage() {
         </div>
     );
 }
+
+    
