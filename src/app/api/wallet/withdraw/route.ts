@@ -36,10 +36,6 @@ export async function POST(req: Request) {
     const userData = userDoc.data()!;
     const userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || 'Unknown User';
 
-
-    // Note: We are not checking for balance here. That logic is handled in the frontend UI.
-    // The backend's job is to create the request for admin approval.
-
     const adminDb = getAdminDb();
     const withdrawalRef = adminDb.collection("users").doc(userId).collection("withdrawalRequests").doc();
 

@@ -33,7 +33,6 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // If session is loaded and user exists, redirect them away from the login page.
     if (!isSessionLoading && user) {
       const defaultPath = getDefaultPath(role);
       router.replace(defaultPath);
@@ -57,19 +56,19 @@ export default function Page() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       toast({ title: "تم تسجيل الدخول بنجاح" });
-      // The useEffect hook will now handle the redirection once the session state updates.
+      // The useEffect hook will handle the redirection.
     } catch (err: any) {
       let msg = "حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.";
       if (err.code === "auth/wrong-password" || err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found') {
         msg = "البريد الإلكتروني أو كلمة المرور غير صحيحة.";
       }
       setError(msg);
+      console.error("Login error:", err);
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  // While session is loading or if a user is found (and redirect is imminent), show a loading screen.
   if (isSessionLoading || user) {
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-background">
@@ -100,7 +99,6 @@ export default function Page() {
     );
   }
 
-  // Render login form only if not loading and no user.
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background p-4">
       <Card className="w-full max-w-sm">

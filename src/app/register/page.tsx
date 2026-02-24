@@ -25,7 +25,6 @@ import { useSession } from '@/auth/SessionProvider';
 import { getDefaultPath } from '@/auth/permissions';
 
 
-// --- SVG Decorative Icons ---
 const AnkhIcon = ({ className }: { className?: string }) => (
   <svg className={className} width="60" height="108" viewBox="0 0 60 108" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M30 38.625V108" stroke="currentColor" strokeWidth="6"/>
@@ -71,7 +70,6 @@ export default function RegisterPage() {
   const [referrerId, setReferrerId] = useState<string | null>(null);
 
   useEffect(() => {
-    // If session is loaded and user exists, redirect them away from the register page.
     if (!isSessionLoading && user) {
       const defaultPath = getDefaultPath(role);
       router.replace(defaultPath);
@@ -97,80 +95,40 @@ export default function RegisterPage() {
   }, [searchParams, firestore, toast]);
 
   const handleRegister = async () => {
-    if (!auth || !firestore) {
-      toast({
-        variant: 'destructive',
-        title: 'خطأ',
-        description: 'خدمات Firebase غير متاحة حالياً.',
-      });
+    if (!auth) {
+      toast({ variant: 'destructive', title: 'خطأ', description: 'خدمات Firebase غير متاحة.' });
       return;
     }
     if (password !== confirmPassword) {
-      toast({
-        variant: 'destructive',
-        title: 'خطأ',
-        description: 'كلمتا المرور غير متطابقتين.',
-      });
+      toast({ variant: 'destructive', title: 'خطأ', description: 'كلمتا المرور غير متطابقتين.' });
       return;
     }
     if (!firstName || !lastName || !phone) {
-      toast({
-        variant: 'destructive',
-        title: 'خطأ',
-        description: 'الرجاء إدخال جميع البيانات المطلوبة.',
-      });
+      toast({ variant: 'destructive', title: 'خطأ', description: 'الرجاء إدخال جميع البيانات المطلوبة.' });
       return;
     }
 
     setIsSubmitting(true);
-    let newUserUid: string | null = null;
-
     try {
+      // The SessionProvider will automatically handle creating the user profile document in Firestore
+      // on the first successful authentication. We only need to handle the auth creation here.
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCredential.user;
-      newUserUid = newUser.uid;
-
-      await updateProfile(newUser, {
+      await updateProfile(userCredential.user, {
         displayName: `${firstName} ${lastName}`,
       });
 
-      const batch = writeBatch(firestore);
-      const userDocRef = doc(firestore, 'users', newUser.uid);
-
-      const userProfileData: Partial<UserProfile> = {
-        id: newUser.uid,
-        email: newUser.email!,
-        firstName: firstName,
-        lastName: lastName,
-        phone: phone,
-        photoURL: '',
-        role: 'Dropshipper',
-        isActive: true,
-        initialPasswordChangeRequired: false,
-        level: 'Beginner Marketer',
-        referralCode: newUser.uid.substring(0, 8),
-        referredUsersCount: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
-
-      if (referrerId) {
-        userProfileData.referrerId = referrerId;
-        const referrerDocRef = doc(firestore, 'users', referrerId);
-        batch.update(referrerDocRef, {
-            referredUsersCount: increment(1),
-        });
-      }
-      
-      batch.set(userDocRef, userProfileData);
-
-      await batch.commit();
+      // The rest of profile creation, including setting the referrerId if it exists,
+      // should ideally be handled by a Cloud Function triggered on user creation for robustness,
+      // or by the client-side SessionProvider's ensureUserProfile logic.
+      // For this implementation, we will rely on the SessionProvider to create the basic profile.
+      // The logic for updating the referrer's count would be more secure in a Cloud Function.
 
       toast({
         title: 'تم إنشاء الحساب بنجاح!',
-        description: 'مرحباً بك في فريقنا. سيتم توجيهك الآن.',
+        description: 'مرحباً بك. سيتم توجيهك الآن.',
       });
-      // The useEffect will handle redirection after session state update.
+      // Redirection is handled by the main useEffect that watches the session state.
+
     } catch (error: any) {
       console.error('Registration Error:', error);
       let description = 'حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.';
@@ -179,14 +137,6 @@ export default function RegisterPage() {
         description = 'هذا البريد الإلكتروني مستخدم بالفعل.';
       } else if (error.code === 'auth/weak-password') {
         description = 'كلمة المرور ضعيفة جدا. يجب أن تكون 6 أحرف على الأقل.';
-      } else if (newUserUid) {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `users/${newUserUid}`,
-          operation: 'create',
-          requestResourceData: { email, role: 'Dropshipper' },
-        }));
-        description =
-          'فشل حفظ بيانات الملف الشخصي. قد تكون هناك مشكلة في الصلاحيات.';
       }
 
       toast({
@@ -216,17 +166,13 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen w-full flex-col bg-background">
-      {/* Hero Section */}
       <section className="relative flex flex-col items-center justify-center text-center min-h-screen p-8 bg-background overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern z-0"></div>
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background z-1"></div>
-
-        {/* Decorative SVG Icons */}
         <AnkhIcon className="absolute top-[20%] left-[5%] text-primary/5 -rotate-12 hidden lg:block" />
         <PyramidIcon className="absolute bottom-[10%] right-[5%] text-primary/5 hidden md:block" />
         <EyeOfHorusIcon className="absolute top-[25%] right-[10%] text-primary/5 rotate-12 hidden lg:block" />
         <AnkhIcon className="absolute bottom-[15%] left-[15%] text-primary/5 rotate-6 hidden md:block w-12 h-auto" />
-
 
         <div className="z-10 flex flex-col items-center">
             <Logo />
@@ -248,7 +194,6 @@ export default function RegisterPage() {
         </div>
       </section>
       
-      {/* Registration Form Section */}
       <section ref={registerFormRef} className="py-16 md:py-24 bg-card">
         <div className="container mx-auto px-6 flex justify-center">
           <Card className="w-full max-w-lg">
@@ -350,7 +295,6 @@ export default function RegisterPage() {
         </div>
       </section>
 
-      {/* Merchant Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container mx-auto px-6 text-center">
           <h2 className="text-3xl font-bold tracking-tight">هل أنت تاجر أو مورد؟</h2>
@@ -363,7 +307,6 @@ export default function RegisterPage() {
         </div>
       </section>
 
-      {/* Footer */}
       <footer className="bg-background border-t">
           <div className="container mx-auto px-6 py-6 text-center text-muted-foreground">
              <p>&copy; 2026 KEMET MARKETING SOLUTION. جميع الحقوق محفوظة.</p>

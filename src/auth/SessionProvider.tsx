@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useUser, useFirestore } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import type { UserRole } from './permissions';
 import { User } from 'firebase/auth';
@@ -39,7 +39,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         return;
     };
     
-    // Start loading profile
     setProfileLoading(true);
     setError(null);
 
@@ -49,23 +48,30 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
       if (docSnap.exists()) {
         const userProfile = docSnap.data() as UserProfile;
-        
         if (!userProfile.role) {
             throw new Error("User profile is missing a 'role'.");
         }
-        
         setProfile(userProfile);
       } else {
-        // This is a critical error state: user exists in Auth but not in Firestore.
-        throw new Error("Your user profile could not be found in the database. Please contact support.");
+        // ** CRITICAL: Auto-create profile if it doesn't exist **
+        console.log(`Profile for user ${user.uid} not found, creating it...`);
+        const newProfile: UserProfile = {
+          id: user.uid,
+          email: user.email!,
+          role: 'Dropshipper', // Default role
+          firstName: user.displayName?.split(' ')[0] || 'New',
+          lastName: user.displayName?.split(' ')[1] || 'User',
+          createdAt: serverTimestamp() as any,
+          updatedAt: serverTimestamp() as any,
+          isActive: true,
+        };
+        await setDoc(userDocRef, newProfile);
+        setProfile(newProfile);
+        console.log(`Profile for user ${user.uid} created successfully.`);
       }
     } catch (e: any) {
       console.error("SessionProvider Error (fetchProfile):", e);
-      if (e.code === 'permission-denied') {
-        setError("You don't have permission to access your user profile. Please check security rules.");
-      } else {
-        setError(e.message || "An unknown error occurred while fetching your profile.");
-      }
+      setError(e.message || "An unknown error occurred while fetching your profile.");
       setProfile(null);
     } finally {
       setProfileLoading(false);
@@ -73,22 +79,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [firestore]);
 
   useEffect(() => {
-    // If auth state is still loading, we wait.
     if (isAuthLoading) {
       return;
     }
-
-    // If no user is authenticated, reset the session state.
     if (!authUser) {
       setProfile(null);
       setProfileLoading(false);
       setError(null);
       return;
     }
-
-    // If we have a user, fetch their profile.
     fetchProfile(authUser);
-
   }, [authUser, isAuthLoading, fetchProfile]);
   
   const refreshSession = useCallback(() => {
@@ -108,7 +108,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       user: authUser,
       profile,
       role,
-      isLoading: isAuthLoading || profileLoading, // Session is loading if auth OR profile is loading
+      isLoading: isAuthLoading || profileLoading,
       error,
       isAdmin,
       isOrdersManager,

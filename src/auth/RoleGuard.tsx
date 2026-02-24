@@ -55,23 +55,20 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isLoading) {
-      return; // Wait until loading is complete
+      return; 
     }
 
-    // If there's no user and we're not on a public path, redirect to login
     if (!user && !isPublicPath) {
       router.replace('/');
       return;
     }
 
-    // If there is a user on a public-only path, redirect to their dashboard
     if (user && role && isPublicPath && !pathname.startsWith('/product')) {
       const defaultPath = getDefaultPath(role);
       router.replace(defaultPath);
       return;
     }
 
-    // If user has a role but no permission for the current path, redirect
     if (user && role && !hasPermission(role, pathname)) {
         const defaultPath = getDefaultPath(role);
         router.replace(defaultPath);
@@ -80,17 +77,14 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
 
   }, [isLoading, user, role, pathname, router, isPublicPath]);
 
-  // Handle loading state
   if (isLoading) {
     return <FullPageLoader message="جاري التحقق من الصلاحيات..." />;
   }
   
-  // Handle session error state
   if (error) {
     return <AuthErrorState error={error} />;
   }
 
-  // Handle redirection states (show loader while redirecting)
   if (!user && !isPublicPath) {
      return <FullPageLoader message="جاري التوجيه لتسجيل الدخول..." />;
   }
@@ -101,6 +95,5 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
      return <FullPageLoader message="غير مصرح بالدخول، جاري التوجيه..." />;
   }
 
-  // If all checks pass, render the children
   return <>{children}</>;
 }

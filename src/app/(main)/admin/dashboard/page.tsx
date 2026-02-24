@@ -124,8 +124,6 @@ export default function AdminDashboardPage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         
-        // This is a robust way to filter, checking if `toDate` is a function before calling it.
-        // This prevents crashes if `createdAt` is a server timestamp placeholder.
         const recentOrders = allOrders.filter(o => o.createdAt && typeof o.createdAt.toDate === 'function' && o.createdAt.toDate() >= thirtyDaysAgo);
 
         const deliveredOrders = recentOrders.filter(o => o.status === 'Delivered');

@@ -29,7 +29,7 @@ import { useToast } from "@/hooks/use-toast";
 import { exportToExcel } from '@/lib/export';
 import { useSession } from '@/auth/SessionProvider';
 import { DeleteOrderAlert } from './_components/delete-order-alert';
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/utils";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -116,17 +116,14 @@ export default function AdminOrdersPage() {
   }, []);
 
   const canAccess = isAdmin || isOrdersManager;
-
-  const usersQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : collection(firestore, 'users'), [firestore, canAccess, isRoleLoading]);
-  const { data: allUsers, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
+  
+  const allOrdersQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collectionGroup(firestore, 'orders'), orderBy(documentId())), [firestore, canAccess, isRoleLoading]);
+  const { data: allOrders, isLoading: ordersLoading, error: queryError, setData: setOrders } = useCollection<Order>(allOrdersQuery);
   
   const shipmentsQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collection(firestore, 'shipments')), [firestore, canAccess, isRoleLoading]);
   const { data: allShipments, isLoading: shipmentsLoading } = useCollection<Shipment>(shipmentsQuery);
 
-  const allOrdersQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collectionGroup(firestore, 'orders'), orderBy(documentId())), [firestore, canAccess, isRoleLoading]);
-  const { data: allRawOrders, isLoading: ordersLoading, error: queryError, setData: setOrders } = useCollection<Order>(allOrdersQuery);
-
-  const isLoading = isRoleLoading || usersLoading || ordersLoading || shipmentsLoading;
+  const isLoading = isRoleLoading || ordersLoading || shipmentsLoading;
 
   const shipmentsMap = useMemo(() => {
     if (!allShipments) return new Map<string, Shipment>();
@@ -137,41 +134,31 @@ export default function AdminOrdersPage() {
     return map;
   }, [allShipments]);
 
-  const usersMap = useMemo(() => {
-    if (!allUsers) return new Map<string, UserProfile>();
-    const map = new Map<string, UserProfile>();
-    allUsers.forEach(user => {
-      map.set(user.id, user);
-    });
-    return map;
-  }, [allUsers]);
-
-  const orders = useMemo(() => {
-    if (!allRawOrders || usersLoading) return [];
-    return allRawOrders.map(order => {
-        const dropshipper = usersMap.get(order.dropshipperId);
-        return {
-            ...order,
-            dropshipperName: dropshipper ? `${dropshipper.firstName} ${dropshipper.lastName}`.trim() : order.dropshipperName
-        }
-    });
-  }, [allRawOrders, usersMap, usersLoading]);
 
   const dropshippers = useMemo(() => {
-    if (!allUsers) return [];
-    return allUsers
-      .filter(u => u.role === 'Dropshipper')
-      .map(u => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email }))
-      .sort((a,b) => a.name.localeCompare(b.name));
-  }, [allUsers]);
+    // This is a placeholder as fetching all users is too slow.
+    // A better approach would be a dedicated 'dropshippers' collection or a search function.
+    if (!allOrders) return [];
+    const uniqueDropshippers = new Map<string, { id: string, name: string }>();
+    allOrders.forEach(order => {
+        if (!uniqueDropshippers.has(order.dropshipperId)) {
+            uniqueDropshippers.set(order.dropshipperId, {
+                id: order.dropshipperId,
+                name: order.dropshipperName || `مسوق (${order.dropshipperId.substring(0,5)})`
+            });
+        }
+    });
+    return Array.from(uniqueDropshippers.values()).sort((a,b) => a.name.localeCompare(b.name));
+  }, [allOrders]);
 
 
    const filteredOrders = useMemo(() => {
-    return orders.filter(order => {
+    if (!allOrders) return [];
+    return allOrders.filter(order => {
         const searchMatch = searchTerm.trim() === '' || 
             order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            order.customerPhone.includes(searchTerm);
+            (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (order.customerPhone && order.customerPhone.includes(searchTerm));
             
         const statusMatch = statusFilter === 'all' || order.status === statusFilter;
         const marketerMatch = marketerFilter === 'all' || order.dropshipperId === marketerFilter;
@@ -179,26 +166,26 @@ export default function AdminOrdersPage() {
 
         return searchMatch && statusMatch && marketerMatch && paymentMatch;
     }).sort((a, b) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
-  }, [orders, searchTerm, statusFilter, marketerFilter, paymentFilter]);
+  }, [allOrders, searchTerm, statusFilter, marketerFilter, paymentFilter]);
 
   useEffect(() => {
     setSelectedOrders([]);
   }, [searchTerm, statusFilter, marketerFilter, paymentFilter]);
   
   const summaryStats = useMemo(() => {
-    if (!orders || !clientRendered) return { revenueToday: 0, ordersToday: 0 };
-    const todaysLoadedOrders = orders.filter(o => o.createdAt && typeof o.createdAt.toDate === 'function' && isToday(o.createdAt.toDate()));
+    if (!allOrders || !clientRendered) return { revenueToday: 0, ordersToday: 0 };
+    const todaysLoadedOrders = allOrders.filter(o => o.createdAt && typeof o.createdAt.toDate === 'function' && isToday(o.createdAt.toDate()));
     const revenueToday = todaysLoadedOrders.filter(o => o.status === 'Delivered').reduce((sum, o) => sum + o.totalAmount, 0);
     return {
         revenueToday: revenueToday,
         ordersToday: todaysLoadedOrders.length,
     }
-  }, [orders, clientRendered]);
+  }, [allOrders, clientRendered]);
 
   const handleStatusUpdate = useCallback(async (order: Order, newStatus: string) => {
-    if (!firestore || !user || !role || !profile || !orders) return;
+    if (!firestore || !user || !role || !profile || !allOrders) return;
     
-    const originalOrders = [...orders];
+    const originalOrders = [...allOrders];
     setOrders(prevOrders => (prevOrders || []).map(o => o.id === order.id ? { ...o, status: newStatus } : o));
     toast({ title: "جاري تحديث حالة الطلب..." });
 
@@ -304,13 +291,13 @@ export default function AdminOrdersPage() {
             description: error.message || "حدث خطأ غير متوقع." 
         });
     }
-  }, [firestore, user, role, toast, setOrders, orders, profile]);
+  }, [firestore, user, role, toast, setOrders, allOrders, profile]);
   
   const handleDeleteOrder = () => {
-    if (!orderToDelete || !firestore || !orders) return;
+    if (!orderToDelete || !firestore || !allOrders) return;
 
     const orderToDeleteCache = { ...orderToDelete };
-    const originalOrders = [...orders];
+    const originalOrders = [...allOrders];
 
     setOrders(prev => (prev || []).filter(o => o.id !== orderToDeleteCache.id));
     setOrderToDelete(null); 
@@ -339,7 +326,7 @@ export default function AdminOrdersPage() {
 
   const handleExport = () => {
     const ordersToExport = selectedOrders.length > 0
-        ? orders.filter(order => selectedOrders.includes(order.id))
+        ? (allOrders || []).filter(order => selectedOrders.includes(order.id))
         : filteredOrders;
 
     if (ordersToExport.length === 0) {
