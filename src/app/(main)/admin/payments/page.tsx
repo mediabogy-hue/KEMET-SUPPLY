@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, AlertTriangle } from "lucide-react";
+import { MoreHorizontal, AlertTriangle, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,8 +15,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+    DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, updateDoc, serverTimestamp, collectionGroup, query, orderBy, documentId } from "firebase/firestore";
+import { collection, doc, updateDoc, serverTimestamp, collectionGroup, query, orderBy, documentId, deleteDoc } from "firebase/firestore";
 import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -25,6 +33,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DeletePaymentAlert } from './_components/delete-payment-alert';
 
 
 const statusVariant: { [key: string]: "default" | "secondary" | "destructive" } = {
@@ -46,6 +55,8 @@ export default function AdminPaymentsPage() {
   const { isAdmin, isFinanceManager, isLoading: isRoleLoading } = useSession();
   const [rejectionReason, setRejectionReason] = useState("");
   const [orderToReject, setOrderToReject] = useState<Order | null>(null);
+  const [paymentToDelete, setPaymentToDelete] = useState<Order | null>(null);
+
 
   const canAccess = isAdmin || isFinanceManager;
   
@@ -90,6 +101,36 @@ export default function AdminPaymentsPage() {
             requestResourceData: updatedData,
         }));
         toast({ variant: "destructive", title: "فشل تحديث الحالة", description: "قد لا تملك الصلاحيات الكافية." });
+    });
+  };
+  
+   const handleDeletePayment = () => {
+    // This function will likely need to delete a 'Payment' document, not an 'Order' document.
+    // Assuming for now the goal is to reset the order's payment status for re-submission.
+    if (!paymentToDelete || !firestore) return;
+
+    const orderRef = doc(firestore, `users/${paymentToDelete.dropshipperId}/orders/${paymentToDelete.id}`);
+    
+    // Resetting payment status instead of deleting the order.
+    const updatedData = {
+      customerPaymentStatus: undefined,
+      customerPaymentProof: undefined,
+      adminNotes: 'تم حذف إثبات الدفع بواسطة الأدمن'
+    };
+
+    setAllOrders(prev => {
+      if (!prev) return null;
+      // Filter out the order from the pending list
+      return prev.filter(o => o.id !== paymentToDelete.id);
+    });
+    toast({ title: "تم حذف إثبات الدفع" });
+    setPaymentToDelete(null);
+
+
+    updateDoc(orderRef, updatedData).catch(err => {
+      // Revert if error
+      setAllOrders(prev => prev ? [...prev, paymentToDelete] : [paymentToDelete]);
+       toast({ variant: "destructive", title: "فشل حذف إثبات الدفع" });
     });
   };
 
@@ -149,17 +190,30 @@ export default function AdminPaymentsPage() {
                          </TableRow>
                       ))}
                       {orders.map((order) => (
-                      <TableRow key={order.id} className="hover:bg-muted/50 cursor-pointer" onClick={() => setSelectedOrder(order)}>
-                          <TableCell className="font-medium">{order.id.substring(0,7).toUpperCase()}</TableCell>
+                      <TableRow key={order.id} className="hover:bg-muted/50">
+                          <TableCell className="font-medium cursor-pointer hover:underline" onClick={() => setSelectedOrder(order)}>{order.id.substring(0,7).toUpperCase()}</TableCell>
                           <TableCell>{order.dropshipperName || `مسوق غير معروف (${order.dropshipperId.substring(0,5)})`}</TableCell>
                           <TableCell className="font-mono">{order.customerPaymentProof?.senderPhoneNumber || 'N/A'}</TableCell>
                           <TableCell className="font-mono">{order.customerPaymentProof?.referenceNumber || 'N/A'}</TableCell>
                           <TableCell>{order.createdAt && typeof order.createdAt.toDate === 'function' ? format(order.createdAt.toDate(), 'yyyy-MM-dd') : 'N/A'}</TableCell>
                           <TableCell className="text-end">{order.totalAmount.toFixed(2)} ج.م</TableCell>
                           <TableCell className="text-end">
-                              <div className="flex justify-end gap-2">
+                              <div className="flex justify-end gap-2 items-center">
                                 <Button variant="destructive" size="sm" onClick={(e) => { e.stopPropagation(); setOrderToReject(order); }}>رفض</Button>
                                 <Button size="sm" onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order, 'Verified'); }}>تأكيد</Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button size="icon" variant="ghost"><MoreHorizontal className="h-4 w-4"/></Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        <DropdownMenuItem onClick={() => setSelectedOrder(order)}>عرض التفاصيل</DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="text-destructive" onClick={() => setPaymentToDelete(order)}>
+                                            <Trash2 className="me-2"/>
+                                            حذف إثبات الدفع
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                           </TableCell>
                       </TableRow>
@@ -219,6 +273,12 @@ export default function AdminPaymentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+       <DeletePaymentAlert
+        payment={paymentToDelete}
+        isOpen={!!paymentToDelete}
+        onOpenChange={(isOpen) => !isOpen && setPaymentToDelete(null)}
+        onConfirm={handleDeletePayment}
+      />
     </>
   );
 }
