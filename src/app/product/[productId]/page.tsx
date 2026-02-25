@@ -257,7 +257,8 @@ export default function PublicProductPage() {
             return;
         }
     
-        const newOrderRef = doc(collection(firestore, `users/${dropshipperId}/orders`));
+        const dropshipperOrderRef = doc(collection(firestore, `users/${dropshipperId}/orders`));
+        const adminOrderRef = doc(collection(firestore, 'adminOrders'), dropshipperOrderRef.id);
         
         let dropshipperName = 'مسوق';
         try {
@@ -273,7 +274,7 @@ export default function PublicProductPage() {
         const batch = writeBatch(firestore);
 
         const orderData: Partial<Order> = {
-            id: newOrderRef.id,
+            id: dropshipperOrderRef.id,
             dropshipperId,
             dropshipperName,
             customerName: data.customerName,
@@ -307,7 +308,9 @@ export default function PublicProductPage() {
             };
         }
 
-        batch.set(newOrderRef, orderData);
+        // Write to both user's subcollection and admin's global collection
+        batch.set(dropshipperOrderRef, orderData);
+        batch.set(adminOrderRef, {...orderData, _originalPath: dropshipperOrderRef.path});
     
         try {
             // Create a record for the referred customer
@@ -337,7 +340,7 @@ export default function PublicProductPage() {
         } catch (error) {
             console.error("Order submission error:", error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-               path: newOrderRef.path,
+               path: dropshipperOrderRef.path,
                operation: 'create',
                requestResourceData: orderData
            }));
@@ -750,4 +753,6 @@ export default function PublicProductPage() {
         </div>
     );
 }
+    
+
     

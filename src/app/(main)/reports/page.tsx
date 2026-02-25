@@ -1,4 +1,5 @@
 
+
 'use client';
 export const dynamic = "force-dynamic";
 
@@ -65,8 +66,7 @@ function ReportsContent() {
     const withdrawalRequestsQuery = useMemoFirebase(() => {
         if (!user || !firestore || !isDropshipper) return null;
         return query(
-            collection(firestore, 'withdrawalRequests'),
-            where('userId', '==', user.uid),
+            collection(firestore, `users/${user.uid}/withdrawalRequests`),
             orderBy("createdAt", "desc")
         );
     }, [user, firestore, isDropshipper]);
@@ -338,3 +338,5 @@ export default function ReportsPage() {
     
     return <ReportsContent />;
 }
+
+    

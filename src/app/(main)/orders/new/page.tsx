@@ -96,6 +96,10 @@ export default function NewOrderPage() {
       updatedAt: serverTimestamp(),
       merchantId: selectedProduct.merchantId || null,
     };
+    
+    if (selectedProduct.merchantInfo) {
+      orderData.merchantInfo = selectedProduct.merchantInfo;
+    }
 
     const batch = writeBatch(firestore);
     batch.set(newOrderRef, orderData);
@@ -275,3 +279,5 @@ export default function NewOrderPage() {
       </div>
   );
 }
+
+    

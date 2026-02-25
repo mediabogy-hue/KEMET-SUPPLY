@@ -1,4 +1,5 @@
 
+
 'use client';
 import dynamic from 'next/dynamic';
 import {
@@ -89,7 +90,7 @@ export default function AdminDashboardPage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return query(
-            collection(firestore, 'orders'),
+            collection(firestore, 'adminOrders'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
             orderBy('createdAt', 'desc'),
             limit(1000)
@@ -224,5 +225,7 @@ export default function AdminDashboardPage() {
         </div>
     );
 }
+
+    
 
     

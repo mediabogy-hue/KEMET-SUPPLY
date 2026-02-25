@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -87,12 +88,15 @@ export default function OrdersPage() {
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
-    const sortedOrders = [...orders].sort((a, b) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
-
+    
+    // No need to sort again, query already does it
     if (activeTab === "all") {
-      return sortedOrders;
+      return orders;
     }
-    return sortedOrders.filter(order => order.status === activeTab);
+    if (activeTab === "Returned") { // Combine Returned and Canceled
+        return orders.filter(order => order.status === 'Returned' || order.status === 'Canceled');
+    }
+    return orders.filter(order => order.status === activeTab);
   }, [orders, activeTab]);
 
   const handleExport = () => {
@@ -244,3 +248,5 @@ export default function OrdersPage() {
     </>
   );
 }
+
+    

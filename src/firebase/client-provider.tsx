@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, type ReactNode } from 'react';
@@ -64,7 +65,7 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     if (typeof window !== 'undefined' && !clientServices) {
         setClientServices(initializeFirebaseServices());
     }
-  }, []); // FIX: Changed dependency from [clientServices] to [] to prevent re-initialization loop.
+  }, []); // Corrected dependency array: was [clientServices], now [] to prevent loop.
 
   return (
     <FirebaseProvider
@@ -77,3 +78,5 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     </FirebaseProvider>
   );
 }
+
+    

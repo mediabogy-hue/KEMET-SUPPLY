@@ -1,9 +1,10 @@
 
+
 'use client';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useUser } from "@/firebase";
-import { collection, query, doc, updateDoc, serverTimestamp, deleteDoc, orderBy, limit } from "firebase/firestore";
+import { collection, query, doc, updateDoc, serverTimestamp, deleteDoc, orderBy, limit, writeBatch } from "firebase/firestore";
 import type { WithdrawalRequest } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { useSession } from "@/auth/SessionProvider";
@@ -33,7 +34,7 @@ export default function AdminWithdrawalsPage() {
 
     const requestsQuery = useMemoFirebase(() => {
         if (!firestore || !canAccess) return null;
-        return query(collection(firestore, 'withdrawalRequests'), orderBy('createdAt', 'desc'), limit(100));
+        return query(collection(firestore, 'adminWithdrawalRequests'), orderBy('createdAt', 'desc'), limit(100));
     }, [firestore, canAccess]);
     
     const { data: requests, isLoading: requestsLoading, error, setData: setRequests } = useCollection<WithdrawalRequest>(requestsQuery);
@@ -68,21 +69,28 @@ export default function AdminWithdrawalsPage() {
 
     const handleStatusUpdate = (request: WithdrawalRequest, newStatus: 'Completed' | 'Rejected') => {
         if (!firestore || !requests) return;
-        const requestRef = doc(firestore, `withdrawalRequests/${request.id}`);
+        
+        const batch = writeBatch(firestore);
+        const adminRequestRef = doc(firestore, `adminWithdrawalRequests/${request.id}`);
+        const userRequestRef = doc(firestore, `users/${request.userId}/withdrawalRequests/${request.id}`);
+
         const updatedData = {
             status: newStatus,
             updatedAt: serverTimestamp(),
         };
+        
+        batch.update(adminRequestRef, updatedData);
+        batch.update(userRequestRef, updatedData);
 
         const originalRequests = [...requests];
         setRequests(prev => (prev || []).map(r => r.id === request.id ? { ...r, status: newStatus } : r));
         toast({ title: "تم تحديث حالة الطلب بنجاح" });
 
-        updateDoc(requestRef, updatedData)
+        batch.commit()
             .catch(async (e: any) => {
                 setRequests(originalRequests); // Revert
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: requestRef.path,
+                    path: `batch update for withdrawal ${request.id}`,
                     operation: 'update',
                     requestResourceData: updatedData,
                 }));
@@ -92,17 +100,23 @@ export default function AdminWithdrawalsPage() {
 
     const handleDeleteRequest = (request: WithdrawalRequest) => {
         if (!firestore || !requests) return;
-        const requestRef = doc(firestore, `withdrawalRequests/${request.id}`);
+
+        const batch = writeBatch(firestore);
+        const adminRequestRef = doc(firestore, `adminWithdrawalRequests/${request.id}`);
+        const userRequestRef = doc(firestore, `users/${request.userId}/withdrawalRequests/${request.id}`);
+
+        batch.delete(adminRequestRef);
+        batch.delete(userRequestRef);
 
         const originalRequests = [...requests];
         setRequests(prev => (prev || []).filter(r => r.id !== request.id));
         toast({ title: "تم حذف طلب السحب بنجاح" });
         
-        deleteDoc(requestRef)
+        batch.commit()
             .catch(async (e) => {
                 setRequests(originalRequests); // Revert
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: requestRef.path,
+                    path: `batch delete for withdrawal ${request.id}`,
                     operation: 'delete',
                 }));
                 toast({ variant: "destructive", title: "فشل حذف الطلب", description: "قد لا تملك الصلاحيات الكافية." });
@@ -178,6 +192,8 @@ export default function AdminWithdrawalsPage() {
 
     
 
+
+    
 
     
 
