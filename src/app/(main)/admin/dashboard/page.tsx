@@ -10,11 +10,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, BarChart, ShieldAlert, DatabaseZap, CheckCircle, ListOrdered } from "lucide-react";
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
+import { useFirestore, useCollection } from "@/firebase";
+import { collection, query, where, Timestamp, orderBy, limit, type Query } from "firebase/firestore";
 import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
-import { useMemo, useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from '@/auth/SessionProvider';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -78,50 +78,48 @@ export default function AdminDashboardPage() {
     const firestore = useFirestore();
     const { user, isProductManager, isStaff, isLoading: isSessionLoading } = useSession();
     const [isClient, setIsClient] = useState(false);
+    const [ordersQuery, setOrdersQuery] = useState<Query | null>(null);
+
+    const canAccess = !isSessionLoading && isStaff;
 
     useEffect(() => {
         setIsClient(true);
-    }, []);
-
-    const canAccess = !isSessionLoading && isStaff;
+        // This effect runs on the client, so it's safe to use new Date()
+        if (firestore && canAccess) {
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const baseQuery = query(
+                collection(firestore, 'orders'),
+                where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
+                orderBy('createdAt', 'desc')
+            );
     
-    const ordersQuery = useMemoFirebase(() => {
-        if (!firestore || !canAccess) return null;
-        
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const baseQuery = query(
-            collection(firestore, 'orders'),
-            where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
-            orderBy('createdAt', 'desc')
-        );
-
-        if (isProductManager && user) {
-            return query(baseQuery, where('merchantId', '==', user.uid), limit(1000));
+            if (isProductManager && user) {
+                setOrdersQuery(query(baseQuery, where('merchantId', '==', user.uid), limit(1000)));
+            } else {
+                setOrdersQuery(query(baseQuery, limit(1000)));
+            }
         }
-
-        return query(baseQuery, limit(1000));
-    }, [firestore, canAccess, isProductManager, user]);
+    }, [firestore, isSessionLoading, isStaff, isProductManager, user, canAccess]);
 
     const { data: allOrders, isLoading: ordersLoading, error: queryError, lastUpdated } = useCollection<Order>(ordersQuery);
 
     const isLoading = !isClient || isSessionLoading || ordersLoading;
-    
     const dataIsEmpty = !isLoading && !queryError && (!allOrders || allOrders.length === 0);
 
-    const dashboardStats = useMemo(() => {
-        const initialStats = {
-            totalRevenue: 0,
-            averageTransactionValue: 0,
-            deliveredOrdersCount: 0,
-            salesByHourData: [] as any[],
-            fastMovingProducts: [] as any[],
-            slowMovingProducts: [] as any[],
-        };
+    const [dashboardStats, setDashboardStats] = useState({
+        totalRevenue: 0,
+        averageTransactionValue: 0,
+        deliveredOrdersCount: 0,
+        salesByHourData: [] as any[],
+        fastMovingProducts: [] as any[],
+        slowMovingProducts: [] as any[],
+    });
 
+    useEffect(() => {
         if (!isClient || !allOrders) {
-            return initialStats;
+            return;
         }
 
         const deliveredOrders = allOrders.filter(o => o.status === 'Delivered');
@@ -151,14 +149,14 @@ export default function AdminDashboardPage() {
         const fastMovers = sortedProducts.slice(0, 5);
         const slowMovers = sortedProducts.slice(-5).reverse();
         
-        return { 
+        setDashboardStats({ 
             totalRevenue: revenue, 
             averageTransactionValue: calculatedAtv,
             deliveredOrdersCount: totalDeliveredOrdersCount,
             salesByHourData: salesByHour,
             fastMovingProducts: fastMovers,
             slowMovingProducts: slowMovers,
-        };
+        });
 
       }, [allOrders, isClient]);
 
@@ -232,13 +230,3 @@ export default function AdminDashboardPage() {
         </div>
     );
 }
-
-    
-
-    
-
-
-
-
-
-    

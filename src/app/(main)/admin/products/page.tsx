@@ -79,6 +79,16 @@ function ProductManagementTab() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [analyzingProduct, setAnalyzingProduct] = useState<Product | null>(null);
     const [productToUpdateStock, setProductToUpdateStock] = useState<Product | null>(null);
+    
+    const [pageState, setPageState] = useState<{
+        stats: { total: number; lowStock: number; outOfStock: number; recent: number };
+        warnings: { lowStock: number; noImages: number; inactive: number };
+        filteredProducts: Product[];
+    }>({
+        stats: { total: 0, lowStock: 0, outOfStock: 0, recent: 0 },
+        warnings: { lowStock: 0, noImages: 0, inactive: 0 },
+        filteredProducts: [],
+    });
 
     const canAccess = isAdmin || isProductManager;
 
@@ -96,13 +106,15 @@ function ProductManagementTab() {
     
     const { data: allProducts, isLoading, error, lastUpdated } = useCollection<Product>(productsQuery);
 
-    const { stats, warnings, filteredProducts } = useMemo(() => {
-        const defaultData = { 
-            stats: { total: 0, lowStock: 0, outOfStock: 0, recent: 0 },
-            warnings: { lowStock: 0, noImages: 0, inactive: 0 },
-            filteredProducts: [],
+    useEffect(() => {
+        if (!allProducts) {
+            setPageState({
+                stats: { total: 0, lowStock: 0, outOfStock: 0, recent: 0 },
+                warnings: { lowStock: 0, noImages: 0, inactive: 0 },
+                filteredProducts: [],
+            });
+            return;
         };
-        if (!allProducts) return defaultData;
 
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
@@ -112,8 +124,7 @@ function ProductManagementTab() {
         let noImagesCount = 0;
         let inactiveCount = 0;
 
-        // Client-side sorting is fine as we're limiting the doc read
-        const sortedProducts = [...allProducts]; // Already sorted by query
+        const sortedProducts = [...allProducts];
 
         for (const p of sortedProducts) {
             if (p.stockQuantity > 0 && p.stockQuantity < MINIMUM_STOCK_LEVEL) lowStockCount++;
@@ -134,7 +145,7 @@ function ProductManagementTab() {
             return stockFilter && searchFilter;
         });
 
-        return {
+        setPageState({
             stats: {
                 total: allProducts.length,
                 lowStock: lowStockCount,
@@ -147,9 +158,10 @@ function ProductManagementTab() {
                 inactive: inactiveCount,
             },
             filteredProducts: filtered,
-        };
+        });
 
     }, [allProducts, filter, searchTerm]);
+
 
     const handleDeleteProduct = () => {
         if (!productToDelete || !firestore) return;
@@ -194,25 +206,25 @@ function ProductManagementTab() {
             </div>
             
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <ProductStatCard title="إجمالي المنتجات" value={stats.total} icon={<Box />} isLoading={isLoading} />
-                <ProductStatCard title="مخزون منخفض" value={stats.lowStock} icon={<Archive />} isLoading={isLoading} description={`أقل من ${MINIMUM_STOCK_LEVEL} قطع`} />
-                <ProductStatCard title="نفد من المخزون" value={stats.outOfStock} icon={<PackageX />} isLoading={isLoading} />
-                <ProductStatCard title="أضيف حديثاً" value={stats.recent} icon={<Clock />} isLoading={isLoading} description="آخر 7 أيام" />
+                <ProductStatCard title="إجمالي المنتجات" value={pageState.stats.total} icon={<Box />} isLoading={isLoading} />
+                <ProductStatCard title="مخزون منخفض" value={pageState.stats.lowStock} icon={<Archive />} isLoading={isLoading} description={`أقل من ${MINIMUM_STOCK_LEVEL} قطع`} />
+                <ProductStatCard title="نفد من المخزون" value={pageState.stats.outOfStock} icon={<PackageX />} isLoading={isLoading} />
+                <ProductStatCard title="أضيف حديثاً" value={pageState.stats.recent} icon={<Clock />} isLoading={isLoading} description="آخر 7 أيام" />
             </div>
 
             <div className="space-y-2">
-                {warnings.lowStock > 0 && 
+                {pageState.warnings.lowStock > 0 && 
                     <Alert>
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>تنبيه: مخزون منخفض</AlertTitle>
-                        <AlertDescription>يوجد {warnings.lowStock} منتج على وشك النفاد. قم بمراجعة المخزون.</AlertDescription>
+                        <AlertDescription>يوجد {pageState.warnings.lowStock} منتج على وشك النفاد. قم بمراجعة المخزون.</AlertDescription>
                     </Alert>
                 }
-                 {warnings.noImages > 0 && 
+                 {pageState.warnings.noImages > 0 && 
                     <Alert variant="destructive">
                         <XCircle className="h-4 w-4" />
                         <AlertTitle>تنبيه: منتجات بدون صور</AlertTitle>
-                        <AlertDescription>يوجد {warnings.noImages} منتج لا يحتوي على صور. الرجاء إضافة صور لظهورها للمسوقين.</AlertDescription>
+                        <AlertDescription>يوجد {pageState.warnings.noImages} منتج لا يحتوي على صور. الرجاء إضافة صور لظهورها للمسوقين.</AlertDescription>
                     </Alert>
                 }
             </div>
@@ -266,7 +278,7 @@ function ProductManagementTab() {
                                     <TableCell className="text-end"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
                                 </TableRow>
                             ))}
-                            {filteredProducts.map(product => {
+                            {pageState.filteredProducts.map(product => {
                                  const stockLevel = product.stockQuantity;
                                  const stockIndicatorColor =
                                     stockLevel === 0 ? "bg-destructive"
@@ -321,7 +333,7 @@ function ProductManagementTab() {
                             })}
                         </TableBody>
                     </Table>
-                     {!isLoading && filteredProducts.length === 0 && (
+                     {!isLoading && pageState.filteredProducts.length === 0 && (
                          <div className="text-center p-8 text-muted-foreground">
                             {error ? "حدث خطأ أثناء تحميل المنتجات" : "لا توجد منتجات تطابق بحثك."}
                         </div>
