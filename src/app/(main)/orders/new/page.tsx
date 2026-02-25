@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -72,7 +73,6 @@ export default function NewOrderPage() {
     const batch = writeBatch(firestore);
 
     const mainOrderRef = doc(collection(firestore, "orders"));
-    const userOrderRef = doc(collection(firestore, `users/${user.uid}/orders`));
     const dropshipperName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || user.displayName || 'مسوق';
 
     const orderData: any = {
@@ -105,7 +105,6 @@ export default function NewOrderPage() {
     }
 
     batch.set(mainOrderRef, orderData);
-    batch.set(userOrderRef, { ...orderData, id: userOrderRef.id }); // Use new ID for subcollection doc
 
     try {
         await batch.commit();
@@ -113,7 +112,7 @@ export default function NewOrderPage() {
         router.push("/orders");
     } catch (error) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `batch write for order`,
+          path: `orders/${mainOrderRef.id}`,
           operation: 'create',
           requestResourceData: orderData
         }));

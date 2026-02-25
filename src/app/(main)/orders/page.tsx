@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import type { Order } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from 'date-fns';
 import { useState, useMemo, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { exportToExcel } from '@/lib/export';
 import { cn } from "@/lib/utils";
 
@@ -84,7 +84,7 @@ export default function OrdersPage() {
     );
   }, [firestore, user]);
 
-  const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+  const { data: orders, isLoading: ordersLoading, error } = useCollection<Order>(ordersQuery);
 
   const filteredOrders = useMemo(() => {
     if (!orders) return [];
@@ -235,7 +235,9 @@ export default function OrdersPage() {
                           })}
                           {(!isLoading && (!filteredOrders || filteredOrders.length === 0)) && (
                               <TableRow>
-                                  <TableCell colSpan={7} className="h-24 text-center">ليس لديك أي طلبات في هذه الفئة.</TableCell>
+                                  <TableCell colSpan={7} className="h-24 text-center">
+                                      {error ? 'فشل تحميل الطلبات' : 'ليس لديك أي طلبات في هذه الفئة.'}
+                                  </TableCell>
                               </TableRow>
                           )}
                       </TableBody>

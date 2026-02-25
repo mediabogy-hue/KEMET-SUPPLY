@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Button } from "@/components/ui/button";
@@ -93,7 +94,7 @@ export default function ProfilePage() {
 
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !authUser) return null;
-        return query(collection(firestore, 'users', authUser.uid, 'orders'));
+        return query(collection(firestore, 'orders'), where('dropshipperId', '==', authUser.uid));
     }, [firestore, authUser]);
     const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 

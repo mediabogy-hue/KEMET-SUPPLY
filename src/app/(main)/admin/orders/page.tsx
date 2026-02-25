@@ -121,20 +121,16 @@ export default function AdminOrdersPage() {
   const allOrdersQuery = useMemoFirebase(() => {
     if (!firestore || !canAccess || !user) return null;
     
-    // Admins and OrdersManagers see all orders from the global collection
-    if (isAdmin || isOrdersManager) {
-        return query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(200));
-    }
-    
-    // ProductManagers (Merchants) see orders only for their products
+    const baseQuery = query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(200));
+
     if (isProductManager) {
-        return query(collectionGroup(firestore, 'orders'), where('merchantId', '==', user.uid), orderBy('createdAt', 'desc'), limit(200));
+        return query(baseQuery, where('merchantId', '==', user.uid));
     }
     
-    return null;
+    return baseQuery;
   }, [firestore, canAccess, isAdmin, isOrdersManager, isProductManager, user]);
   
-  const { data: allOrders, isLoading: ordersLoading, error: queryError, setData: setAllOrders } = useCollection<Order>(allOrdersQuery);
+  const { data: allOrders, isLoading: ordersLoading, error: queryError, setData: setAllOrders, lastUpdated } = useCollection<Order>(allOrdersQuery);
   
   const shipmentsQuery = useMemoFirebase(() => (isRoleLoading || !firestore || !canAccess) ? null : query(collection(firestore, 'shipments')), [firestore, canAccess, isRoleLoading]);
   const { data: allShipments, isLoading: shipmentsLoading } = useCollection<Shipment>(shipmentsQuery);
@@ -203,9 +199,7 @@ export default function AdminOrdersPage() {
     setAllOrders(prevOrders => (prevOrders || []).map(o => o.id === order.id ? { ...o, status: newStatus } : o));
     toast({ title: "جاري تحديث حالة الطلب..." });
 
-    const batch = writeBatch(firestore);
     const mainOrderRef = doc(firestore, `orders/${order.id}`);
-    const userOrderRef = doc(firestore, `users/${order.dropshipperId}/orders/${order.id}`);
 
     try {
         if (newStatus === 'Confirmed') {
@@ -234,7 +228,6 @@ export default function AdminOrdersPage() {
                         item: { productId: productData.id, needed: orderData.quantity, available: productData.stockQuantity }
                     };
                     transaction.update(mainOrderRef, { stockError });
-                    transaction.update(userOrderRef, { stockError });
                     throw new Error(stockError.message);
                 }
 
@@ -254,7 +247,6 @@ export default function AdminOrdersPage() {
                     stockApplied: true, stockAppliedAt: serverTimestamp(), stockError: null,
                 };
                 transaction.update(mainOrderRef, updatePayload);
-                transaction.update(userOrderRef, updatePayload);
             });
             toast({ title: "تم تأكيد الطلب وخصم المخزون بنجاح!" });
         } else if (newStatus === 'Canceled' || newStatus === 'Returned') {
@@ -284,13 +276,10 @@ export default function AdminOrdersPage() {
                 }
                 
                 transaction.update(mainOrderRef, statusAndStockUpdate);
-                transaction.update(userOrderRef, statusAndStockUpdate);
             });
             toast({ title: `تم تحديث حالة الطلب إلى "${statusText[newStatus]}"` });
         } else {
-            batch.update(mainOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
-            batch.update(userOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
-            await batch.commit();
+            await updateDoc(mainOrderRef, { status: newStatus, updatedAt: serverTimestamp() });
             toast({ title: "تم تحديث حالة الطلب بنجاح" });
         }
 
@@ -325,20 +314,15 @@ export default function AdminOrdersPage() {
     setAllOrders(prev => (prev || []).filter(o => o.id !== orderToDeleteCache.id));
     setOrderToDelete(null); 
     
-    const batch = writeBatch(firestore);
     const mainOrderRef = doc(firestore, 'orders', orderToDeleteCache.id);
-    const userOrderRef = doc(firestore, `users/${orderToDeleteCache.dropshipperId}/orders/${orderToDeleteCache.id}`);
-    
-    batch.delete(mainOrderRef);
-    batch.delete(userOrderRef);
     
     try {
-        await batch.commit();
+        await deleteDoc(mainOrderRef);
         toast({ title: "تم حذف الطلب بنجاح" });
     } catch (error) {
         setAllOrders(originalOrders);
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-            path: `batch delete on orders/${orderToDeleteCache.id}`,
+            path: mainOrderRef.path,
             operation: 'delete',
         }));
         toast({ variant: "destructive", title: "فشل حذف الطلب", description: "قد لا تملك الصلاحيات الكافية." });

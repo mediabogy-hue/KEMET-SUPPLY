@@ -113,7 +113,8 @@ export function useCollection<T = any>(
                 path,
             });
             setError(contextualError);
-            errorEmitter.emit('permission-error', contextualError);
+            // We no longer emit globally as it crashes the whole app.
+            // The component consuming the hook is responsible for displaying the error.
         } else {
             setError(error);
         }

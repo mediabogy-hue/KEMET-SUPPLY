@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState } from "react";
@@ -155,6 +156,9 @@ export function AddProductDialog() {
               name: finalCategoryName,
               imageUrl: `https://picsum.photos/seed/${encodeURIComponent(finalCategoryName)}/200`,
               dataAiHint: finalCategoryName.split(" ").slice(0, 2).join(" "),
+              isAvailable: true,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
             };
             batch.set(categoryDocRef, newCategoryData);
         }

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Image from "next/image";
@@ -33,7 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, query, orderBy, updateDoc, serverTimestamp } from "firebase/firestore";
+import { collection, doc, deleteDoc, query, orderBy, updateDoc, serverTimestamp, where } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -69,7 +70,7 @@ const MINIMUM_STOCK_LEVEL = 3;
 function ProductManagementTab() {
     const firestore = useFirestore();
     const { toast } = useToast();
-    const { isAdmin, isProductManager, isLoading: isRoleLoading } = useSession();
+    const { user, isAdmin, isProductManager, isLoading: isRoleLoading } = useSession();
 
     const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
@@ -82,10 +83,16 @@ function ProductManagementTab() {
     const canAccess = isAdmin || isProductManager;
 
     const productsQuery = useMemoFirebase(() => {
-        if (!firestore || !canAccess) return null;
-        // Simple query without complex ordering to avoid index requirements
-        return query(collection(firestore, "products"));
-    }, [firestore, canAccess]);
+        if (!firestore || !canAccess || !user) return null;
+        
+        let q = query(collection(firestore, "products"));
+
+        if (isProductManager) {
+            q = query(q, where("merchantId", "==", user.uid));
+        }
+
+        return q;
+    }, [firestore, canAccess, user, isProductManager]);
     
     const { data: allProducts, isLoading, error, lastUpdated } = useCollection<Product>(productsQuery);
 
@@ -181,7 +188,7 @@ function ProductManagementTab() {
                 <Button variant="secondary" size="lg" disabled><FileDown className="me-2"/> استيراد منتجات</Button>
                 <Button variant="outline" size="lg" asChild>
                     <Link href="https://kemet-s.myeasyorders.com/" target="_blank" rel="noopener noreferrer">
-                        <Eye /> عرض الكتالوج
+                        <Eye /> عرض الكتالوج العام
                     </Link>
                 </Button>
             </div>
@@ -350,7 +357,7 @@ function ProductManagementTab() {
 function InventoryTab() {
   const firestore = useFirestore();
   const { toast } = useToast();
-  const { isAdmin, isProductManager, isLoading: isRoleLoading } = useSession();
+  const { user, isAdmin, isProductManager, isLoading: isRoleLoading } = useSession();
 
   // State for filters and search
   const [stockFilter, setStockFilter] = useState('all');
@@ -364,9 +371,14 @@ function InventoryTab() {
   const canAccess = isAdmin || isProductManager;
 
   const productsQuery = useMemoFirebase(() => {
-    if (!firestore || !canAccess) return null;
-    return query(collection(firestore, "products"));
-  }, [firestore, canAccess]);
+    if (!firestore || !canAccess || !user) return null;
+    let q = query(collection(firestore, "products"));
+
+    if (isProductManager) {
+        q = query(q, where("merchantId", "==", user.uid));
+    }
+    return q;
+  }, [firestore, canAccess, user, isProductManager]);
   
   const categoriesQuery = useMemoFirebase(() => {
     if (!firestore || !canAccess) return null;
