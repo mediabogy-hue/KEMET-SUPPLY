@@ -1,4 +1,3 @@
-
 'use client';
 import dynamic from 'next/dynamic';
 import {
@@ -8,10 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DollarSign, ShoppingCart, Users, TrendingUp, TrendingDown, Trophy, BarChart, AlertTriangle, ShieldAlert, DatabaseZap } from "lucide-react";
+import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, BarChart, ShieldAlert, DatabaseZap, CheckCircle } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
-import type { Order, UserProfile, Product } from "@/lib/types";
+import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { useMemo, useState, useEffect } from "react";
 import { useSession } from '@/auth/SessionProvider';
@@ -19,11 +18,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SeedDatabaseButton } from './_components/seed-database-button';
 
-
-const RecentSales = dynamic(() => import("../../dashboard/_components/recent-sales").then(mod => mod.RecentSales), {
-    loading: () => <div className="space-y-6">{Array.from({length: 5}).map((_, i) => <div className="flex items-center" key={i}><Skeleton className="h-10 w-10 rounded-full" /><div className="ms-4 space-y-2"><Skeleton className="h-4 w-[100px]" /><Skeleton className="h-3 w-[150px]" /></div><Skeleton className="ms-auto h-5 w-[60px]" /></div>)}</div>,
-    ssr: false,
-});
 
 const SalesByHourChart = dynamic(() => import("./_components/sales-by-hour-chart").then(mod => mod.SalesByHourChart), {
     loading: () => <Skeleton className="h-[250px]" />,
@@ -89,8 +83,6 @@ export default function AdminDashboardPage() {
 
     const canAccess = !isSessionLoading && isAdmin;
     
-    const usersQuery = useMemoFirebase(() => (firestore && canAccess) ? collection(firestore, 'users') : null, [firestore, canAccess]);
-    
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !canAccess) return null;
         const thirtyDaysAgo = new Date();
@@ -99,38 +91,28 @@ export default function AdminDashboardPage() {
             collection(firestore, 'orders'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
             orderBy('createdAt', 'desc'),
-            limit(500) // Limit to last 500 orders to avoid performance issues
+            limit(1000)
         );
     }, [firestore, canAccess]);
 
-    const { data: allOrders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(ordersQuery);
-    const { data: users, isLoading: usersLoading, lastUpdated: usersLastUpdated } = useCollection<UserProfile>(usersQuery);
-    const { data: products, isLoading: productsLoading, lastUpdated: productsLastUpdated } = useCollection<Product>(collection(firestore, "products"));
+    const { data: allOrders, isLoading: ordersLoading, error: ordersError, lastUpdated } = useCollection<Order>(ordersQuery);
 
-    const isLoading = !isClient || isSessionLoading || usersLoading || ordersLoading || productsLoading;
+    const isLoading = !isClient || isSessionLoading || ordersLoading;
     const queryError = ordersError;
     
-    const dataIsEmpty = !isLoading && !queryError && (!allOrders || allOrders.length === 0) && (!users || users.length <= 1);
-
-    const lastUpdated = useMemo(() => {
-        const timestamps = [usersLastUpdated, productsLastUpdated].filter(Boolean) as Date[];
-        if (timestamps.length === 0) return null;
-        return new Date(Math.max(...timestamps.map(t => t.getTime())));
-    }, [usersLastUpdated, productsLastUpdated]);
+    const dataIsEmpty = !isLoading && !queryError && (!allOrders || allOrders.length === 0);
 
     const dashboardStats = useMemo(() => {
         const initialStats = {
             totalRevenue: 0,
             averageTransactionValue: 0,
-            totalMarketers: 0,
-            topPerformers: [] as any[],
-            recentSales: [] as any[],
+            deliveredOrdersCount: 0,
             salesByHourData: [] as any[],
             fastMovingProducts: [] as any[],
             slowMovingProducts: [] as any[],
         };
 
-        if (!isClient || !allOrders || !users || !products) {
+        if (!isClient || !allOrders) {
             return initialStats;
         }
 
@@ -140,8 +122,6 @@ export default function AdminDashboardPage() {
         
         const calculatedAtv = totalDeliveredOrdersCount > 0 ? revenue / totalDeliveredOrdersCount : 0;
         
-        const totalMarketersCount = users.filter(u => u.role === 'Dropshipper').length;
-
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
@@ -163,48 +143,21 @@ export default function AdminDashboardPage() {
         const fastMovers = sortedProducts.slice(0, 5);
         const slowMovers = sortedProducts.slice(-5).reverse();
         
-        const dropshipperSales = deliveredOrders.reduce((acc, order) => {
-            const dropshipperId = order.dropshipperId;
-            if (!acc[dropshipperId]) acc[dropshipperId] = { totalSales: 0, orderCount: 0 };
-            acc[dropshipperId].totalSales += order.totalAmount;
-            acc[dropshipperId].orderCount++;
-            return acc;
-        }, {} as Record<string, { totalSales: number, orderCount: number }>);
-
-        const topPerformersData = Object.keys(dropshipperSales).map(id => {
-            const user = users.find(u => u.id === id);
-            if (!user) return null;
-            const sales = dropshipperSales[id];
-            return {
-                 id: user!.id, 
-                 name: `${user!.firstName} ${user!.lastName}`.trim(), 
-                 email: `${sales.orderCount} طلبات مكتملة`, 
-                 amount: `+${sales.totalSales.toFixed(2)} ج.م` 
-            };
-        }).filter(Boolean) as any[];
-        
-        const sortedTopPerformers = topPerformersData.sort((a, b) => parseFloat(b.amount.replace(/[^0-9.-]+/g,"")) - parseFloat(a.amount.replace(/[^0-9.-]+/g,""))).slice(0, 5);
-
-        const sortedOrdersForRecents = [...allOrders].sort((a, b) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0));
-        const recentSalesData = sortedOrdersForRecents.slice(0, 5).map(order => ({ id: order.id, name: order.customerName, email: order.customerPhone, amount: `+${order.totalAmount.toFixed(2)} ج.م` }));
-
         return { 
             totalRevenue: revenue, 
             averageTransactionValue: calculatedAtv,
-            totalMarketers: totalMarketersCount,
-            topPerformers: sortedTopPerformers,
-            recentSales: recentSalesData,
+            deliveredOrdersCount: totalDeliveredOrdersCount,
             salesByHourData: salesByHour,
             fastMovingProducts: fastMovers,
             slowMovingProducts: slowMovers,
         };
 
-      }, [allOrders, users, products, isClient]);
+      }, [allOrders, isClient]);
 
     const primaryStats = [
         { title: "إجمالي الإيرادات (آخر 30 يوم)", value: `${dashboardStats.totalRevenue.toFixed(2)} ج.م`, icon: <DollarSign />, description: "من الطلبات المكتملة." },
         { title: "متوسط قيمة الطلب", value: `${dashboardStats.averageTransactionValue.toFixed(2)} ج.م`, icon: <ShoppingCart />, description: "متوسط قيمة كل طلب مكتمل." },
-        { title: "إجمالي المسوقين", value: dashboardStats.totalMarketers, icon: <Users />, description: "إجمالي المسوقين في النظام." },
+        { title: "الطلبات المكتملة (آخر 30 يوم)", value: dashboardStats.deliveredOrdersCount, icon: <CheckCircle />, description: "إجمالي الطلبات التي تم توصيلها بنجاح." },
     ];
     
   return (
@@ -254,43 +207,20 @@ export default function AdminDashboardPage() {
                 ))}
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                <Card className="lg:col-span-3">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BarChart className="text-muted-foreground"/> المبيعات خلال اليوم</CardTitle>
-                        <CardDescription>إجمالي المبيعات المحققة كل ساعة على مدار اليوم الحالي.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="ps-2">
-                        <SalesByHourChart data={dashboardStats.salesByHourData} />
-                    </CardContent>
-                </Card>
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Trophy className="text-amber-400" />
-                            أفضل المسوقين أداءً
-                        </CardTitle>
-                        <CardDescription>المسوقون الأعلى تحقيقًا للمبيعات المكتملة.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <RecentSales data={dashboardStats.topPerformers}/>
-                    </CardContent>
-                </Card>
-            </div>
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><BarChart className="text-muted-foreground"/> المبيعات خلال اليوم</CardTitle>
+                    <CardDescription>إجمالي المبيعات المحققة كل ساعة على مدار اليوم الحالي.</CardDescription>
+                </CardHeader>
+                <CardContent className="ps-2">
+                    <SalesByHourChart data={dashboardStats.salesByHourData} />
+                </CardContent>
+            </Card>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ProductPerformanceTable title="المنتجات الأسرع مبيعًا" icon={<TrendingUp className="text-green-400"/>} products={dashboardStats.fastMovingProducts}/>
                 <ProductPerformanceTable title="المنتجات الأبطأ مبيعًا" icon={<TrendingDown className="text-red-400"/>} products={dashboardStats.slowMovingProducts}/>
             </div>
-            
-             <Card>
-                <CardHeader>
-                    <CardTitle>أحدث عمليات البيع</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <RecentSales data={dashboardStats.recentSales}/>
-                </CardContent>
-            </Card>
         </div>
     );
 }
