@@ -10,6 +10,7 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
+  collectionGroup
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -112,6 +113,7 @@ export function useCollection<T = any>(
                 path,
             });
             setError(contextualError);
+            errorEmitter.emit('permission-error', contextualError);
         } else {
             setError(error);
         }

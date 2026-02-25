@@ -62,10 +62,12 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
   useEffect(() => {
     // This effect runs only once on the client after the initial render.
     // It's the designated safe space to perform client-side initializations.
-    if (typeof window !== 'undefined' && !clientServices) {
+    if (typeof window !== 'undefined' && !services) {
         setClientServices(initializeFirebaseServices());
+    } else if (services) {
+        setClientServices(services);
     }
-  }, []); // Corrected dependency array: was [clientServices], now [] to prevent loop.
+  }, []);
 
   return (
     <FirebaseProvider
@@ -78,5 +80,3 @@ export function FirebaseClientProvider({ children }: FirebaseClientProviderProps
     </FirebaseProvider>
   );
 }
-
-    

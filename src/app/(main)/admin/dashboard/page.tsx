@@ -76,26 +76,33 @@ const ProductPerformanceTable = ({ title, products, icon }: { title: string, pro
 
 export default function AdminDashboardPage() {
     const firestore = useFirestore();
-    const { isAdmin, isLoading: isSessionLoading } = useSession();
+    const { user, isProductManager, isStaff, isLoading: isSessionLoading } = useSession();
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
-    const canAccess = !isSessionLoading && isAdmin;
+    const canAccess = !isSessionLoading && isStaff;
     
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !canAccess) return null;
+        
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        return query(
-            collection(firestore, 'adminOrders'),
+        
+        const baseQuery = query(
+            collection(firestore, 'orders'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
-            orderBy('createdAt', 'desc'),
-            limit(1000)
+            orderBy('createdAt', 'desc')
         );
-    }, [firestore, canAccess]);
+
+        if (isProductManager && user) {
+            return query(baseQuery, where('merchantId', '==', user.uid), limit(1000));
+        }
+
+        return query(baseQuery, limit(1000));
+    }, [firestore, canAccess, isProductManager, user]);
 
     const { data: allOrders, isLoading: ordersLoading, error: queryError, lastUpdated } = useCollection<Order>(ordersQuery);
 

@@ -1,4 +1,5 @@
 
+
 import React from "react";
 import {
   LayoutDashboard, Box, ShoppingCart, PlusCircle, Wallet, BookText,
@@ -46,11 +47,13 @@ export const getNavLinks = (roles: UserRoles): NavLink[] => {
     }
     
     const staffLinks = new Map<string, NavLink>();
+    staffLinks.set("/messages", { href: "/messages", label: "الرسائل", icon: React.createElement(MessageSquare) });
     
     // Add links based on specific staff roles
     if (isProductManager) {
         staffLinks.set("/admin/products", { href: "/admin/products", label: "الكتالوج", icon: React.createElement(Box) });
-        staffLinks.set("/admin/inventory/external", { href: "/admin/inventory/external", label: "مخزن التجار", icon: React.createElement(Warehouse) });
+        staffLinks.set("/admin/orders", { href: "/admin/orders", label: "متابعة الطلبات", icon: React.createElement(ListOrdered) });
+        staffLinks.set("/admin/inventory/external", { href: "/admin/inventory/external", label: "مخزن خارجي", icon: React.createElement(Warehouse) });
     }
     
     if (isOrdersManager) {
@@ -64,8 +67,7 @@ export const getNavLinks = (roles: UserRoles): NavLink[] => {
     }
 
     // If the user is any kind of staff, give them access to messages and return their specific links
-    if (staffLinks.size > 0) {
-        staffLinks.set("/messages", { href: "/messages", label: "الرسائل", icon: React.createElement(MessageSquare) });
+    if (isProductManager || isOrdersManager || isFinanceManager) {
         return Array.from(staffLinks.values());
     }
 

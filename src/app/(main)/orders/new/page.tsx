@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export default function NewOrderPage() {
     }
 
     const newOrderRef = doc(collection(firestore, `users/${user.uid}/orders`));
-    const adminOrderRef = doc(collection(firestore, 'adminOrders'), newOrderRef.id);
+    const adminOrderRef = doc(collection(firestore, 'orders'), newOrderRef.id);
     const dropshipperName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || user.displayName || 'مسوق';
 
     const orderData: any = {
@@ -95,6 +96,7 @@ export default function NewOrderPage() {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       merchantId: selectedProduct.merchantId || null,
+      merchantName: selectedProduct.merchantName || null
     };
     
     if (selectedProduct.merchantInfo) {
@@ -279,5 +281,3 @@ export default function NewOrderPage() {
       </div>
   );
 }
-
-    

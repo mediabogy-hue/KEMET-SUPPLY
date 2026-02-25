@@ -1,4 +1,5 @@
 
+
 import type { UserProfile } from '@/lib/types';
 
 // Define a type for roles for clarity
@@ -18,7 +19,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   Admin: ['/admin'],
   OrdersManager: ['/admin/orders', '/admin/shipping'],
   FinanceManager: ['/admin/withdrawals', '/admin/payments'],
-  ProductManager: ['/admin/products', '/admin/inventory', '/admin/categories', '/admin/inquiries'],
+  ProductManager: ['/admin/products', '/admin/inventory', '/admin/categories', '/admin/inquiries', '/admin/orders'],
   Dropshipper: ['/dashboard', '/products', '/orders', '/reports', '/profile', '/messages', '/policy'],
 };
 

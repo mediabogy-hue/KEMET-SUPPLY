@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
@@ -49,10 +50,9 @@ export default function DashboardPage() {
 
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
-        return query(
-          collection(firestore, 'users', user.uid, 'orders')
-        );
-      }, [firestore, user]);
+        // Correctly query the nested collection for the logged-in user
+        return query(collection(firestore, 'users', user.uid, 'orders'));
+    }, [firestore, user]);
     
     const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
 

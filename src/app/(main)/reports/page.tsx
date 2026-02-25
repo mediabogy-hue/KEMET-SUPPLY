@@ -1,4 +1,5 @@
 
+
 'use client';
 export const dynamic = "force-dynamic";
 
@@ -56,11 +57,11 @@ function ReportsContent() {
     const firestore = useFirestore();
     const { isDropshipper, profile: userProfile, isLoading: profileLoading } = useSession();
 
-    const allUserOrdersQuery = useMemoFirebase(() => {
+    const deliveredOrdersQuery = useMemoFirebase(() => {
         if (!user || !firestore || !isDropshipper) return null;
         return query(collection(firestore, 'users', user.uid, 'orders'), where('status', '==', 'Delivered'));
     }, [user, firestore, isDropshipper]);
-    const { data: allUserOrders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(allUserOrdersQuery);
+    const { data: deliveredOrders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(deliveredOrdersQuery);
     
     const withdrawalRequestsQuery = useMemoFirebase(() => {
         if (!user || !firestore || !isDropshipper) return null;
@@ -97,14 +98,12 @@ function ReportsContent() {
             return isNaN(num) ? 0 : num;
         };
 
-        const deliveredOrders = allUserOrders || [];
-
-        const totalProfitFromSales = deliveredOrders.reduce((sum, order) => {
+        const totalProfitFromSales = (deliveredOrders || []).reduce((sum, order) => {
             const commission = order.totalCommission ?? ((order.unitCommission ?? 0) * (order.quantity ?? 0));
             return sum + safeParseFloat(commission);
         }, 0);
 
-        const saleTransactions: Transaction[] = deliveredOrders.map(order => {
+        const saleTransactions: Transaction[] = (deliveredOrders || []).map(order => {
             const commission = order.totalCommission ?? ((order.unitCommission ?? 0) * (order.quantity ?? 0));
             return {
                 id: order.id,
@@ -150,7 +149,7 @@ function ReportsContent() {
             pendingWithdrawalAmount: totalPendingWithdrawalAmount,
             transactions: allTransactions
         };
-    }, [allUserOrders, withdrawalRequests, bonuses]);
+    }, [deliveredOrders, withdrawalRequests, bonuses]);
 
     const financialStats = [
         { title: "الرصيد القابل للسحب", value: `${availableForWithdrawal.toFixed(2)} ج.م`, icon: <Wallet className="h-5 w-5 text-muted-foreground" />, description: "الأرباح الجاهزة للسحب فور تسليم الطلبات" },
