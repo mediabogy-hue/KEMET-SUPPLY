@@ -1,9 +1,10 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
 
 export function usePageVisibility() {
-  const [isVisible, setIsVisible] = useState(typeof document !== 'undefined' ? document.visibilityState === 'visible' : true);
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -11,6 +12,9 @@ export function usePageVisibility() {
     const handleVisibilityChange = () => {
       setIsVisible(document.visibilityState === 'visible');
     };
+    
+    // Set the initial client-side value on mount
+    handleVisibilityChange();
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
