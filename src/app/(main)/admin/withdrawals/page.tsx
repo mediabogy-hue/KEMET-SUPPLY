@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useUser } from "@/firebase";
-import { collectionGroup, query, doc, updateDoc, serverTimestamp, deleteDoc } from "firebase/firestore";
+import { collection, query, doc, updateDoc, serverTimestamp, deleteDoc, orderBy } from "firebase/firestore";
 import type { WithdrawalRequest } from "@/lib/types";
 import { useMemo, useState } from "react";
 import { useSession } from "@/auth/SessionProvider";
@@ -31,9 +31,10 @@ export default function AdminWithdrawalsPage() {
 
     const canAccess = isAdmin || isFinanceManager;
 
-    // DISABLED: This query is incompatible with the current Firestore security rules which use exists().
-    // This is the root cause of permission errors. The query must be disabled to ensure stability.
-    const requestsQuery = null;
+    const requestsQuery = useMemoFirebase(() => {
+        if (!firestore || !canAccess) return null;
+        return query(collection(firestore, 'withdrawalRequests'), orderBy('createdAt', 'desc'));
+    }, [firestore, canAccess]);
     
     const { data: requests, isLoading: requestsLoading, error, setData: setRequests } = useCollection<WithdrawalRequest>(requestsQuery);
     
@@ -67,7 +68,7 @@ export default function AdminWithdrawalsPage() {
 
     const handleStatusUpdate = (request: WithdrawalRequest, newStatus: 'Completed' | 'Rejected') => {
         if (!firestore || !requests) return;
-        const requestRef = doc(firestore, `users/${request.userId}/withdrawalRequests`, request.id);
+        const requestRef = doc(firestore, `withdrawalRequests/${request.id}`);
         const updatedData = {
             status: newStatus,
             updatedAt: serverTimestamp(),
@@ -91,7 +92,7 @@ export default function AdminWithdrawalsPage() {
 
     const handleDeleteRequest = (request: WithdrawalRequest) => {
         if (!firestore || !requests) return;
-        const requestRef = doc(firestore, `users/${request.userId}/withdrawalRequests/${request.id}`);
+        const requestRef = doc(firestore, `withdrawalRequests/${request.id}`);
 
         const originalRequests = [...requests];
         setRequests(prev => (prev || []).filter(r => r.id !== request.id));
@@ -131,13 +132,16 @@ export default function AdminWithdrawalsPage() {
                             onPaymentMethodChange={setPaymentMethodFilter}
                         />
                     </CardHeader>
-                    <Alert variant="destructive" className="mx-6 mb-0">
-                        <ShieldAlert className="h-4 w-4" />
-                        <AlertTitle>عرض طلبات السحب معطل مؤقتاً</AlertTitle>
-                        <AlertDescription>
-                            تم تعطيل عرض قائمة طلبات السحب الشاملة مؤقتًا لحل مشكلة أداء تتعلق بصلاحيات قاعدة البيانات.
-                        </AlertDescription>
-                    </Alert>
+                    {error && (
+                         <Alert variant="destructive" className="mx-6 mb-4">
+                            <ShieldAlert className="h-4 w-4" />
+                            <AlertTitle>خطأ في جلب البيانات</AlertTitle>
+                            <AlertDescription>
+                                لم نتمكن من تحميل قائمة السحوبات. قد يكون السبب عدم وجود صلاحيات كافية أو مشكلة في قاعدة البيانات.
+                                 <p className="mt-2 text-xs font-mono">{error.message}</p>
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     <CardContent className="p-0">
                          {isLoading ? (
                             <div className="p-6 space-y-2">
@@ -145,7 +149,7 @@ export default function AdminWithdrawalsPage() {
                             </div>
                          ) : error ? (
                              <div className="p-6 text-center text-destructive">
-                                 <p>فشل تحميل البيانات: {error.message}</p>
+                                 <p>فشل تحميل البيانات</p>
                              </div>
                          ) : (
                             <WithdrawalsTable
@@ -174,5 +178,7 @@ export default function AdminWithdrawalsPage() {
 
     
 
+
+    
 
     

@@ -24,7 +24,7 @@ import {
     DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, updateDoc, serverTimestamp, collectionGroup, query, orderBy, documentId, deleteDoc } from "firebase/firestore";
+import { collection, doc, updateDoc, serverTimestamp, query, orderBy, where } from "firebase/firestore";
 import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -60,10 +60,10 @@ export default function AdminPaymentsPage() {
 
   const canAccess = isAdmin || isFinanceManager;
   
-  // DISABLED: This query is incompatible with the current Firestore security rules which use exists().
-  // This is the root cause of the permission errors. The query must be disabled to ensure stability.
-  // A more advanced solution like data aggregation via Cloud Functions is needed for this feature.
-  const allOrdersQuery = null; 
+  const allOrdersQuery = useMemoFirebase(() => {
+    if (!firestore || !canAccess) return null;
+    return query(collection(firestore, 'orders'), where('customerPaymentStatus', '==', 'Pending'));
+  }, [firestore, canAccess]);
 
   const { data: allOrders, isLoading: ordersLoading, error: ordersError, setData: setAllOrders, lastUpdated } = useCollection<Order>(allOrdersQuery);
 
@@ -71,14 +71,12 @@ export default function AdminPaymentsPage() {
 
   const orders = useMemo((): Order[] => {
     if (!allOrders) return [];
-    return allOrders
-      .filter(o => o.customerPaymentStatus === 'Pending')
-      .sort((a, b) => (a.createdAt?.toDate?.()?.getTime() || 0) - (b.createdAt?.toDate?.()?.getTime() || 0));
+    return [...allOrders].sort((a, b) => (a.createdAt?.toDate?.()?.getTime() || 0) - (b.createdAt?.toDate?.()?.getTime() || 0));
   }, [allOrders]);
 
   const handleStatusUpdate = (order: Order, newStatus: 'Verified' | 'Rejected', notes?: string) => {
     if (!firestore) return;
-    const orderRef = doc(firestore, `users/${order.dropshipperId}/orders/${order.id}`);
+    const orderRef = doc(firestore, `orders/${order.id}`);
     
     const updatedData: any = { customerPaymentStatus: newStatus, updatedAt: serverTimestamp() };
     if (notes) {
@@ -108,16 +106,14 @@ export default function AdminPaymentsPage() {
   };
   
    const handleDeletePayment = () => {
-    // This function will likely need to delete a 'Payment' document, not an 'Order' document.
-    // Assuming for now the goal is to reset the order's payment status for re-submission.
     if (!paymentToDelete || !firestore) return;
 
-    const orderRef = doc(firestore, `users/${paymentToDelete.dropshipperId}/orders/${paymentToDelete.id}`);
+    const orderRef = doc(firestore, `orders/${paymentToDelete.id}`);
     
     // Resetting payment status instead of deleting the order.
     const updatedData = {
-      customerPaymentStatus: undefined,
-      customerPaymentProof: undefined,
+      customerPaymentStatus: null, // Using null to remove the field
+      customerPaymentProof: null, // Using null to remove the field
       adminNotes: 'تم حذف إثبات الدفع بواسطة الأدمن'
     };
 
@@ -158,13 +154,6 @@ export default function AdminPaymentsPage() {
               <RefreshIndicator isLoading={isLoading} lastUpdated={lastUpdated} />
           </CardHeader>
           <CardContent>
-              <Alert variant="destructive" className="mb-4">
-                  <ShieldAlert className="h-4 w-4" />
-                  <AlertTitle>عرض الدفعات معطل مؤقتاً</AlertTitle>
-                  <AlertDescription>
-                      تم تعطيل عرض قائمة الدفعات الشاملة مؤقتًا لحل مشكلة أداء تتعلق بصلاحيات قاعدة البيانات.
-                  </AlertDescription>
-              </Alert>
               {ordersError && (
                 <Alert variant="destructive" className="mb-4">
                     <AlertTriangle className="h-4 w-4" />
@@ -292,3 +281,5 @@ export default function AdminPaymentsPage() {
     </>
   );
 }
+
+    

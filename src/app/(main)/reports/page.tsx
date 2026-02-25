@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Wallet, TrendingUp, CircleDollarSign, Hourglass } from "lucide-react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, Timestamp, doc, documentId } from "firebase/firestore";
+import { collection, query, orderBy, Timestamp, doc, where } from "firebase/firestore";
 import type { Order, WithdrawalRequest, UserProfile, Bonus } from "@/lib/types";
 import { format } from 'date-fns';
 import { WithdrawalDialog } from './_components/withdrawal-dialog';
@@ -58,14 +58,15 @@ function ReportsContent() {
 
     const allOrdersQuery = useMemoFirebase(() => {
         if (!user || !firestore || !isDropshipper) return null;
-        return query(collection(firestore, `users/${user.uid}/orders`));
+        return query(collection(firestore, 'orders'), where('dropshipperId', '==', user.uid));
     }, [user, firestore, isDropshipper]);
     const { data: allUserOrders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(allOrdersQuery);
     
     const withdrawalRequestsQuery = useMemoFirebase(() => {
         if (!user || !firestore || !isDropshipper) return null;
         return query(
-            collection(firestore, `users/${user.uid}/withdrawalRequests`),
+            collection(firestore, "withdrawalRequests"),
+            where("userId", "==", user.uid),
             orderBy("createdAt", "desc")
         );
     }, [user, firestore, isDropshipper]);
@@ -337,5 +338,7 @@ export default function ReportsPage() {
     
     return <ReportsContent />;
 }
+
+    
 
     

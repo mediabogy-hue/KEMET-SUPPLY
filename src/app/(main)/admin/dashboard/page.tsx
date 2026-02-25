@@ -97,7 +97,8 @@ export default function AdminDashboardPage() {
         return query(
             collection(firestore, 'orders'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(500) // Limit to last 500 orders to avoid performance issues
         );
     }, [firestore, canAccess]);
 
@@ -277,5 +278,7 @@ export default function AdminDashboardPage() {
         </div>
     );
 }
+
+    
 
     

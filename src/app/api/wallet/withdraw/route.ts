@@ -1,3 +1,4 @@
+
 export const runtime = "nodejs";
 
 import { NextResponse } from "next/server";
@@ -28,7 +29,6 @@ export async function POST(req: Request) {
     const decodedToken = await adminApp.auth().verifyIdToken(idToken);
     const userId = decodedToken.uid;
     
-    // Fetch user's name for denormalization
     const userDoc = await getAdminDb().collection('users').doc(userId).get();
     if (!userDoc.exists) {
         return NextResponse.json({ error: "User profile not found" }, { status: 404 });
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || 'Unknown User';
 
     const adminDb = getAdminDb();
-    const withdrawalRef = adminDb.collection("users").doc(userId).collection("withdrawalRequests").doc();
+    const withdrawalRef = adminDb.collection("withdrawalRequests").doc();
 
     await withdrawalRef.set({
       id: withdrawalRef.id,
@@ -63,3 +63,5 @@ export async function POST(req: Request) {
     );
   }
 }
+
+    
