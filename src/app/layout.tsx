@@ -1,10 +1,13 @@
+
 import type { Metadata } from 'next';
 import { Toaster } from "@/components/ui/toaster"
+import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { SessionProvider } from '@/auth/SessionProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'KEMET SUPPLY',
-  description: 'Your app, reset to a clean starting point.',
+  title: 'Tashghil Dropship',
+  description: 'Your dropshipping platform.',
 };
 
 export default function RootLayout({
@@ -21,8 +24,12 @@ export default function RootLayout({
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <FirebaseClientProvider>
+          <SessionProvider>
+            {children}
+            <Toaster />
+          </SessionProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );

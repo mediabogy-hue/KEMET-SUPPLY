@@ -1,33 +1,38 @@
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import {
-  getFirestore,
-  initializeFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-} from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+import { initializeApp, getApps, getApp, FirebaseOptions } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+import { firebaseConfig } from "@/firebase/config";
+
+// Assert that the config values are not undefined
+const nonNullableConfig: FirebaseOptions = {
+    apiKey: firebaseConfig.apiKey!,
+    authDomain: firebaseConfig.authDomain!,
+    projectId: firebaseConfig.projectId!,
+    storageBucket: firebaseConfig.storageBucket!,
+    messagingSenderId: firebaseConfig.messagingSenderId!,
+    appId: firebaseConfig.appId!,
 };
 
-export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// Initialize Firebase
+export const app = getApps().length ? getApp() : initializeApp(nonNullableConfig);
 export const auth = getAuth(app);
+export const storage = getStorage(app);
 
-// Prevent duplicate init (HMR / Turbopack)
-export const db = (() => {
-  try {
-    return initializeFirestore(app, {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager(),
-      }),
-    });
-  } catch {
-    return getFirestore(app);
-  }
-})();
+// Initialize Firestore with offline persistence
+// Using a function to handle HMR (Hot Module Replacement) correctly
+let db: ReturnType<typeof getFirestore>;
+try {
+  db = getFirestore(app);
+} catch (e) {
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+  });
+}
+export { db };
