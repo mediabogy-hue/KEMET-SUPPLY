@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -247,7 +248,7 @@ export default function PublicProductPage() {
         }
     
         const newOrderId = doc(collection(firestore, 'id_generator')).id;
-        const dropshipperOrderRef = doc(firestore, `users/${dropshipperId}/orders/${newOrderId}`);
+        const newOrderRef = doc(firestore, 'orders', newOrderId);
     
         let dropshipperName = 'مسوق';
         try {
@@ -297,7 +298,7 @@ export default function PublicProductPage() {
             };
         }
 
-        batch.set(dropshipperOrderRef, orderData);
+        batch.set(newOrderRef, orderData);
     
         try {
             // Create a record for the referred customer
@@ -327,7 +328,7 @@ export default function PublicProductPage() {
         } catch (error) {
             console.error("Order submission error:", error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-               path: dropshipperOrderRef.path,
+               path: newOrderRef.path,
                operation: 'create',
                requestResourceData: orderData
            }));

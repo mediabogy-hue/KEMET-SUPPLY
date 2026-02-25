@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { DollarSign, ShoppingCart, TrendingUp, TrendingDown, BarChart, ShieldAlert, DatabaseZap, CheckCircle, ListOrdered } from "lucide-react";
 import { useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, query, where, Timestamp, orderBy, limit, collectionGroup } from "firebase/firestore";
+import { collection, query, where, Timestamp, orderBy, limit } from "firebase/firestore";
 import type { Order } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { useMemo, useState, useEffect } from "react";
@@ -89,7 +89,7 @@ export default function AdminDashboardPage() {
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         return query(
-            collectionGroup(firestore, 'orders'),
+            collection(firestore, 'orders'),
             where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)),
             orderBy('createdAt', 'desc'),
             limit(1000)

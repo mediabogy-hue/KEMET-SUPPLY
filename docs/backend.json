@@ -1164,29 +1164,27 @@
         }
       },
       {
-        "path": "/users/{userId}/orders/{orderId}",
+        "path": "/orders/{orderId}",
         "definition": {
           "entityName": "Order",
           "schema": {
             "$ref": "#/backend/entities/Order"
           },
-          "description": "Orders placed by a specific user. Nested for ownership.",
+          "description": "Global collection of all orders. Accessible by staff, and by dropshippers for their own orders.",
           "params": [
-            { "name": "userId", "description": "The owner of the order." },
             { "name": "orderId", "description": "The unique identifier for the order." }
           ]
         }
       },
       {
-        "path": "/users/{userId}/withdrawalRequests/{requestId}",
+        "path": "/withdrawalRequests/{requestId}",
         "definition": {
           "entityName": "WithdrawalRequest",
           "schema": {
             "$ref": "#/backend/entities/WithdrawalRequest"
           },
-          "description": "Withdrawal requests made by a specific user. Nested for ownership.",
+          "description": "Global collection of all withdrawal requests. Accessible by staff, and by users for their own requests.",
           "params": [
-            { "name": "userId", "description": "The user making the request." },
             { "name": "requestId", "description": "The unique ID for the withdrawal request." }
           ]
         }

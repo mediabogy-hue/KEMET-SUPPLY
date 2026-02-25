@@ -39,22 +39,13 @@ service cloud.firestore {
 
     // USERS
     match /users/{userId} {
-      allow create: if true;
+      allow create: if isOwner(userId);
       allow get: if isOwner(userId) || isStaff();
       allow list: if isStaff();
       allow update: if isOwner(userId) || isStaff();
       allow delete: if isAdmin();
       
-      // USER SUBCOLLECTIONS
-      match /orders/{orderId} {
-        allow create: if true; // Allow public order creation.
-        allow read: if isOwner(userId) || isStaff();
-        allow update: if isOwner(userId) || isStaff();
-        allow delete: if isAdmin();
-      }
-      match /withdrawalRequests/{requestId} {
-         allow read, write: if isOwner(userId);
-      }
+      // USER SUBCOLLECTIONS (Owned by the user)
       match /bonuses/{bonusId} {
         allow read: if isOwner(userId) || isStaff();
         allow create, update, delete: if isStaff();
@@ -64,27 +55,33 @@ service cloud.firestore {
       }
     }
     
-    // ADMIN-ONLY: COLLECTION GROUP QUERIES
-    // These allow staff to list data across all users.
-    match /{path=**}/orders/{orderId} {
-      allow get, list, update: if isStaff();
-      allow delete: if isAdmin();
-    }
-    match /{path=**}/withdrawalRequests/{requestId} {
-       allow get, list, update: if isStaff();
-       allow delete: if isAdmin();
-    }
-    
     // GLOBAL COLLECTIONS
+    match /orders/{orderId} {
+        // Allow anyone to create an order (for public product page)
+        // as long as the data is valid.
+        allow create: if request.resource.data.dropshipperId != null;
+        allow get: if isStaff() || isOwner(resource.data.dropshipperId);
+        allow list: if isStaff();
+        allow update: if isStaff() || isOwner(resource.data.dropshipperId);
+        allow delete: if isAdmin();
+    }
+
+    match /withdrawalRequests/{requestId} {
+       allow get: if isStaff() || isOwner(resource.data.userId);
+       allow list: if isStaff();
+       allow create: if isOwner(request.resource.data.userId);
+       allow update, delete: if isStaff();
+    }
+
     match /payments/{paymentId} {
-      allow read: if isStaff() || isOwner(resource.data.dropshipperId);
+      allow get: if isStaff() || isOwner(resource.data.dropshipperId);
       allow list: if isStaff();
       allow create: if isOwner(request.resource.data.dropshipperId);
       allow update, delete: if isStaff();
     }
     
     match /products/{productId} {
-      allow read: if true; // Publicly readable
+      allow read: if true;
       allow list: if isSignedIn();
       allow create, update, delete: if isStaff();
 
@@ -95,7 +92,7 @@ service cloud.firestore {
     }
 
     match /productCategories/{categoryId} {
-      allow read, list: if true; // Publicly readable
+      allow read, list: if true;
       allow write: if isStaff();
     }
     match /shipments/{shipmentId} {

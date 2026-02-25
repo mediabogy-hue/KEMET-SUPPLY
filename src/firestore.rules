@@ -22,11 +22,9 @@ service cloud.firestore {
     function isOrdersManager() {
       return exists(/databases/$(database)/documents/roles_orders_manager/$(request.auth.uid));
     }
-
     function isFinanceManager() {
       return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid));
     }
-
     function isProductManager() {
       return exists(/databases/$(database)/documents/roles_product_manager/$(request.auth.uid));
     }
@@ -41,15 +39,10 @@ service cloud.firestore {
 
     // USERS
     match /users/{userId} {
-      // Let any signed in user create their own doc. Required for account creation.
       allow create: if isOwner(userId);
-      // User can read their own doc, Staff can read any user doc.
       allow get: if isOwner(userId) || isStaff();
-      // Only staff can list all users.
       allow list: if isStaff();
-      // User can update their own doc, Admins can update any doc.
       allow update: if isOwner(userId) || isStaff();
-      // Only Admins can delete users.
       allow delete: if isAdmin();
       
       // USER SUBCOLLECTIONS (Owned by the user)
@@ -62,24 +55,24 @@ service cloud.firestore {
       }
     }
     
-    // ORDERS (Global)
+    // GLOBAL COLLECTIONS
     match /orders/{orderId} {
-      allow get: if isStaff() || isOwner(resource.data.dropshipperId);
-      allow list: if isStaff(); // Admins can list all. Dropshippers must query with a `where` clause.
-      allow create: if isOwner(request.resource.data.dropshipperId);
-      allow update: if isStaff() || isOwner(resource.data.dropshipperId);
-      allow delete: if isAdmin();
+        // Allow anyone to create an order (for public product page)
+        // as long as the data is valid.
+        allow create: if request.resource.data.dropshipperId != null;
+        allow get: if isStaff() || isOwner(resource.data.dropshipperId);
+        allow list: if isStaff();
+        allow update: if isStaff() || isOwner(resource.data.dropshipperId);
+        allow delete: if isAdmin();
     }
-    
-    // WITHDRAWAL REQUESTS (Global)
+
     match /withdrawalRequests/{requestId} {
        allow get: if isStaff() || isOwner(resource.data.userId);
        allow list: if isStaff();
        allow create: if isOwner(request.resource.data.userId);
        allow update, delete: if isStaff();
     }
-    
-    // PAYMENTS (Global)
+
     match /payments/{paymentId} {
       allow get: if isStaff() || isOwner(resource.data.dropshipperId);
       allow list: if isStaff();
@@ -87,9 +80,8 @@ service cloud.firestore {
       allow update, delete: if isStaff();
     }
     
-    // PRODUCTS
     match /products/{productId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow list: if isSignedIn();
       allow create, update, delete: if isStaff();
 
@@ -99,22 +91,18 @@ service cloud.firestore {
       }
     }
 
-    // PUBLIC & ADMIN-ONLY COLLECTIONS
     match /productCategories/{categoryId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if true;
       allow write: if isStaff();
     }
     match /shipments/{shipmentId} {
-        allow read, list: if isStaff();
-        allow write: if isStaff();
+        allow read, list, write: if isStaff();
         match /events/{eventId} {
-            allow read, list: if isStaff();
-            allow write: if isStaff();
+            allow read, list, write: if isStaff();
         }
     }
     match /stockLedger/{ledgerId} {
-      allow read, list: if isStaff();
-      allow create, update, delete: if isStaff();
+      allow read, list, create, update, delete: if isStaff();
     }
     match /paymentMethods/{methodId} {
         allow read, list: if isSignedIn();
@@ -128,8 +116,7 @@ service cloud.firestore {
         allow read, write: if isAdmin();
     }
     match /auditLogs/{logId} {
-        allow read, list: if isAdmin();
-        allow create, update, delete: if isAdmin();
+        allow read, list, create, update, delete: if isAdmin();
     }
      match /merchantInquiries/{inquiryId} {
       allow create: if true;
@@ -150,8 +137,6 @@ service cloud.firestore {
       allow update, delete: if false;
     }
     
-    // This collection is used only to generate unique IDs client-side.
-    // No one should be able to read or write to it directly.
     match /id_generator/{any} {
       allow read, write: if false;
     }
@@ -162,5 +147,11 @@ service cloud.firestore {
     match /roles_orders_manager/{userId} { allow read, write: if isAdmin(); }
     match /roles_finance_manager/{userId} { allow read, write: if isAdmin(); }
 
+    match /marketingCustomers/{customerId} { 
+        allow create: if true;
+        allow read, update, delete: if isStaff();
+    }
+    match /marketingCampaigns/{any} { allow read, write: if isStaff(); }
+    match /automationSettings/{any} { allow read, write: if isStaff(); }
   }
 }
