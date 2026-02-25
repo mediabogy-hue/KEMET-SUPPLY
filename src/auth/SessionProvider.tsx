@@ -78,15 +78,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [firestore]);
 
   useEffect(() => {
+    // If auth is still loading, do nothing yet.
     if (isAuthLoading) {
+      setProfileLoading(true);
       return;
     }
+    // If auth has loaded and there's no user, we are done.
     if (!authUser) {
       setProfile(null);
       setProfileLoading(false);
       setError(null);
       return;
     }
+    // If auth has loaded and there IS a user, fetch their profile.
     fetchProfile(authUser);
   }, [authUser, isAuthLoading, fetchProfile]);
   

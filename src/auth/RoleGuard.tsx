@@ -12,34 +12,14 @@ import { useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useEffect } from 'react';
 
-const FullPageLoader = () => (
+const FullPageLoader = ({ message }: { message: string}) => (
      <div className="flex min-h-screen w-full items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-muted-foreground">
-          <svg
-            className="h-5 w-5 animate-spin text-primary"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-          <span>جاري التحميل...</span>
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          <span>{message}</span>
         </div>
       </div>
 );
-
 
 const AuthErrorState = ({ error }: { error: string }) => {
     const auth = useAuth();
@@ -71,48 +51,49 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const publicPaths = ['/', '/register', '/forgot-password'];
-  const isPublicPath = publicPaths.includes(pathname) || pathname.startsWith('/product');
-
   useEffect(() => {
     if (isLoading) {
-      return; 
+      return; // Wait until session is loaded
     }
 
-    if (!user && !isPublicPath) {
+    // If no user is logged in, redirect to login page
+    if (!user) {
       router.replace('/');
       return;
     }
 
-    if (user && role && isPublicPath && !pathname.startsWith('/product')) {
-      const defaultPath = getDefaultPath(role);
-      router.replace(defaultPath);
-      return;
-    }
-
-    if (user && role && !hasPermission(role, pathname)) {
+    // If user has a role, check for permissions
+    if (role) {
+      if (!hasPermission(role, pathname)) {
+        // If user doesn't have permission, redirect to their default page
         const defaultPath = getDefaultPath(role);
         router.replace(defaultPath);
-        return;
+      }
     }
-
-  }, [isLoading, user, role, pathname, router, isPublicPath]);
+    // If user is logged in but role is still loading, the isLoading flag will handle the loader
+    
+  }, [isLoading, user, role, pathname, router]);
 
   if (isLoading) {
-    return <FullPageLoader />;
+    return <FullPageLoader message="جاري التحقق من الصلاحيات..." />;
   }
   
   if (error) {
     return <AuthErrorState error={error} />;
   }
 
-  // If we are still figuring out where to go, show a loader.
-  // This prevents rendering children that are about to be unmounted by a redirect.
-  if ((!user && !isPublicPath) || 
-      (user && role && isPublicPath && !pathname.startsWith('/product')) || 
-      (user && role && !hasPermission(role, pathname))) {
-     return <FullPageLoader />;
+  // If after loading there is still no user, it means the redirect is in progress.
+  // Render loader to avoid flashing content.
+  if (!user) {
+    return <FullPageLoader message="جاري التوجيه..." />;
   }
 
+  // If user is logged in but role is not yet determined OR user lacks permission and redirect is pending,
+  // show loader.
+  if (!role || !hasPermission(role, pathname)) {
+     return <FullPageLoader message="جاري التحقق من الصلاحيات..." />;
+  }
+
+  // If all checks pass, render the protected children components
   return <>{children}</>;
 }

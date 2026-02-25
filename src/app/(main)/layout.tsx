@@ -18,30 +18,30 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className={cn(
-        "flex min-h-screen bg-gradient-to-br from-background to-background/80"
-      )}>
-        <Sidebar side="right" collapsible="icon" className="border-s bg-sidebar text-sidebar-foreground no-print">
-            <SidebarHeader>
-                <Logo />
-            </SidebarHeader>
-            <SidebarContent className="p-2">
-                <SidebarNav />
-            </SidebarContent>
-            <SidebarFooter>
-                {/* Footer content if any */}
-            </SidebarFooter>
-        </Sidebar>
-        <main className="flex flex-1 flex-col">
-          <Header />
-          <div className="flex-1 p-6 sm:p-8 lg:p-10">
-            <RoleGuard>
+    <RoleGuard>
+      <SidebarProvider defaultOpen={true}>
+        <div className={cn(
+          "flex min-h-screen bg-gradient-to-br from-background to-background/80"
+        )}>
+          <Sidebar side="right" collapsible="icon" className="border-s bg-sidebar text-sidebar-foreground no-print">
+              <SidebarHeader>
+                  <Logo />
+              </SidebarHeader>
+              <SidebarContent className="p-2">
+                  <SidebarNav />
+              </SidebarContent>
+              <SidebarFooter>
+                  {/* Footer content if any */}
+              </SidebarFooter>
+          </Sidebar>
+          <main className="flex flex-1 flex-col">
+            <Header />
+            <div className="flex-1 p-6 sm:p-8 lg:p-10">
               {children}
-            </RoleGuard>
-          </div>
-        </main>
-      </div>
-    </SidebarProvider>
+            </div>
+          </main>
+        </div>
+      </SidebarProvider>
+    </RoleGuard>
   );
 }
