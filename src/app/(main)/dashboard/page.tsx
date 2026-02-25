@@ -39,6 +39,11 @@ export default function DashboardPage() {
     const { profile: userProfile, isLoading: profileLoading } = useSession();
     
     const [referralLink, setReferralLink] = useState('');
+    const [isClient, setIsClient] = useState(false);
+
+    useEffect(() => {
+        setIsClient(true);
+    }, []);
 
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -99,7 +104,7 @@ export default function DashboardPage() {
             salesChartData: [],
             recentSales: []
         };
-        if (!orders) return fallback;
+        if (!orders || !isClient) return fallback;
         
         const sortedOrders = [...orders].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
@@ -118,19 +123,29 @@ export default function DashboardPage() {
             const date = order.createdAt?.toDate?.();
             if (!date) return acc;
             
-            // Consistent formatting on both server and client
-            const month = date.toLocaleDateString('en-US', { month: 'short' }); 
-            if (!acc[month]) {
-              acc[month] = 0;
+            const year = date.getFullYear();
+            const month = date.getMonth(); // 0-11
+            const monthKey = `${year}-${month}`;
+            
+            if (!acc[monthKey]) {
+              acc[monthKey] = { year, month, total: 0 };
             }
-            acc[month] += order.totalCommission || 0;
+            acc[monthKey].total += order.totalCommission || 0;
             return acc;
-          }, {} as {[key: string]: number});
+          }, {} as {[key: string]: {year: number, month: number, total: number}});
           
-        const chartData = Object.entries(monthlyProfits).map(([name, total]) => ({
-            name,
-            total,
-        })).reverse();
+        const chartData = Object.values(monthlyProfits)
+            .sort((a, b) => {
+                if (a.year !== b.year) return a.year - b.year;
+                return a.month - b.month;
+            })
+            .map(monthData => {
+                const date = new Date(monthData.year, monthData.month);
+                return {
+                    name: date.toLocaleDateString('ar-EG', { month: 'short' }),
+                    total: monthData.total,
+                }
+            });
 
 
         const recentSalesData = sortedOrders.slice(0, 5).map(order => ({
@@ -141,7 +156,7 @@ export default function DashboardPage() {
         }));
         
         return { ...profitAndOrders, salesChartData: chartData, recentSales: recentSalesData };
-    }, [orders]);
+    }, [orders, isClient]);
 
     const isLoading = ordersLoading || profileLoading;
     
