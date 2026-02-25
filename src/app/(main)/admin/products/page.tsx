@@ -34,7 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, deleteDoc, query, orderBy, updateDoc, serverTimestamp, where } from "firebase/firestore";
+import { collection, doc, deleteDoc, query, orderBy, updateDoc, serverTimestamp, where, limit } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
 import { Skeleton, RefreshIndicator } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -85,7 +85,7 @@ function ProductManagementTab() {
     const productsQuery = useMemoFirebase(() => {
         if (!firestore || !canAccess || !user) return null;
         
-        let q = query(collection(firestore, "products"));
+        let q = query(collection(firestore, "products"), orderBy("updatedAt", "desc"), limit(200));
 
         if (isProductManager) {
             q = query(q, where("merchantId", "==", user.uid));
@@ -112,8 +112,8 @@ function ProductManagementTab() {
         let noImagesCount = 0;
         let inactiveCount = 0;
 
-        // Client-side sorting
-        const sortedProducts = [...allProducts].sort((a, b) => (b.updatedAt?.toDate?.()?.getTime() || 0) - (a.updatedAt?.toDate?.()?.getTime() || 0));
+        // Client-side sorting is fine as we're limiting the doc read
+        const sortedProducts = [...allProducts]; // Already sorted by query
 
         for (const p of sortedProducts) {
             if (p.stockQuantity > 0 && p.stockQuantity < MINIMUM_STOCK_LEVEL) lowStockCount++;
@@ -372,7 +372,7 @@ function InventoryTab() {
 
   const productsQuery = useMemoFirebase(() => {
     if (!firestore || !canAccess || !user) return null;
-    let q = query(collection(firestore, "products"));
+    let q = query(collection(firestore, "products"), orderBy("stockQuantity", "asc"), limit(200));
 
     if (isProductManager) {
         q = query(q, where("merchantId", "==", user.uid));
@@ -413,6 +413,7 @@ function InventoryTab() {
     });
 
     if (sortConfig !== null) {
+      // Data is already sorted by the query, but we re-sort on client if user clicks header
       filtered.sort((a, b) => {
         const aVal = a[sortConfig.key as keyof Product] as number;
         const bVal = b[sortConfig.key as keyof Product] as number;
