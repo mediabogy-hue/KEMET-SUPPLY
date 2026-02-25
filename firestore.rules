@@ -47,7 +47,10 @@ service cloud.firestore {
       
       // USER SUBCOLLECTIONS
       match /orders/{orderId} {
-        allow read, write: if isOwner(userId);
+        allow create: if true; // Allow public order creation.
+        allow read: if isOwner(userId) || isStaff();
+        allow update: if isOwner(userId) || isStaff();
+        allow delete: if isAdmin();
       }
       match /withdrawalRequests/{requestId} {
          allow read, write: if isOwner(userId);
@@ -146,7 +149,11 @@ service cloud.firestore {
     match /roles_product_manager/{userId} { allow read, write: if isAdmin(); }
     match /roles_orders_manager/{userId} { allow read, write: if isAdmin(); }
     match /roles_finance_manager/{userId} { allow read, write: if isAdmin(); }
-    match /marketingCustomers/{any} { allow read, write: if isStaff(); }
+
+    match /marketingCustomers/{customerId} { 
+        allow create: if true;
+        allow read, update, delete: if isStaff();
+    }
     match /marketingCampaigns/{any} { allow read, write: if isStaff(); }
     match /automationSettings/{any} { allow read, write: if isStaff(); }
   }
