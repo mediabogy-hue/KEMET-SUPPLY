@@ -20,6 +20,8 @@ import type { Order, UserProfile } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useSession } from '@/auth/SessionProvider';
+import { format } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 const SalesChart = dynamic(() => import("./_components/sales-chart").then(mod => mod.SalesChart), {
     loading: () => <Skeleton className="h-[350px]" />,
@@ -48,8 +50,7 @@ export default function DashboardPage() {
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(
-          collection(firestore, 'orders'),
-          where('dropshipperId', '==', user.uid)
+          collection(firestore, 'users', user.uid, 'orders')
         );
       }, [firestore, user]);
     
@@ -142,7 +143,7 @@ export default function DashboardPage() {
             .map(monthData => {
                 const date = new Date(monthData.year, monthData.month);
                 return {
-                    name: date.toLocaleDateString('ar-EG', { month: 'short' }),
+                    name: format(date, 'MMM', { locale: ar }),
                     total: monthData.total,
                 }
             });
