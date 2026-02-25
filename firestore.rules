@@ -84,7 +84,7 @@ service cloud.firestore {
     }
     
     match /products/{productId} {
-      allow read: if isSignedIn();
+      allow read: if true; // Publicly readable
       allow list: if isSignedIn();
       allow create, update, delete: if isStaff();
 
@@ -95,7 +95,7 @@ service cloud.firestore {
     }
 
     match /productCategories/{categoryId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if true; // Publicly readable
       allow write: if isStaff();
     }
     match /shipments/{shipmentId} {

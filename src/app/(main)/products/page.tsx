@@ -28,6 +28,83 @@ import { Label } from "@/components/ui/label";
 
 const PAGE_SIZE = 8;
 
+function CopyLinkDialog({
+  product,
+  isOpen,
+  onOpenChange,
+}: {
+  product: Product | null;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { user } = useUser();
+  const { toast } = useToast();
+  const [link, setLink] = useState('');
+
+  useEffect(() => {
+    if (product && user && typeof window !== 'undefined') {
+      const newLink = `${window.location.origin}/product/${product.id}?ref=${user.uid}`;
+      setLink(newLink);
+    }
+  }, [product, user]);
+
+  const handleCopy = () => {
+    if (!link) return;
+    navigator.clipboard.writeText(link).then(() => {
+      toast({
+        title: "تم نسخ الرابط بنجاح!",
+        description: "يمكنك الآن مشاركة الرابط مع عملائك.",
+      });
+      onOpenChange(false); // Close dialog on successful copy
+    }).catch(err => {
+      console.error("Failed to copy inside dialog:", err);
+      toast({
+        variant: "destructive",
+        title: "فشل النسخ",
+        description: "لم نتمكن من النسخ تلقائياً. الرجاء نسخ الرابط يدوياً.",
+      });
+    });
+  };
+
+  if (!product) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>رابط التسويق للمنتج</DialogTitle>
+          <DialogDescription>
+            شارك هذا الرابط لتسجيل المبيعات تحت حسابك.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="marketing-link">رابط التسويق الخاص بك</Label>
+          <Input
+            id="marketing-link"
+            value={link}
+            readOnly
+            onFocus={(e) => e.target.select()}
+            className="text-left"
+            dir="ltr"
+          />
+        </div>
+        <DialogFooter className="sm:justify-between gap-2 mt-4">
+           <DialogClose asChild>
+            <Button type="button" variant="secondary">
+              إغلاق
+            </Button>
+          </DialogClose>
+          <Button type="button" onClick={handleCopy}>
+            <Copy className="me-2 h-4 w-4" />
+            نسخ الرابط
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
 export default function ProductsPage() {
   const { toast } = useToast();
   const { user, isUserLoading } = useUser();
@@ -42,7 +119,7 @@ export default function ProductsPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [linkToCopy, setLinkToCopy] = useState<string | null>(null);
+  const [productToGetLink, setProductToGetLink] = useState<Product | null>(null);
 
   const fetchProducts = useCallback(async (loadMore = false) => {
     if (!firestore || !user) return;
@@ -112,30 +189,6 @@ export default function ProductsPage() {
         (searchTerm === '' || product.name.toLowerCase().includes(searchTerm.toLowerCase()) || product.description.toLowerCase().includes(searchTerm.toLowerCase()))
       );
   }, [products, selectedCategory, searchTerm]);
-
-
-  const handleCopyLink = (productId: string) => {
-    if (!user) {
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "يجب عليك تسجيل الدخول لنسخ الرابط.",
-      });
-      return;
-    }
-
-    const link = `${window.location.origin}/product/${productId}?ref=${user.uid}`;
-    navigator.clipboard.writeText(link).then(() => {
-      toast({
-        title: "تم نسخ رابط التسويق الخاص بك",
-        description: "يمكنك الآن مشاركة رابط المنتج لتتبع مبيعاتك.",
-      });
-    }).catch(err => {
-      console.error('Failed to copy: ', err);
-      // Fallback to showing the dialog
-      setLinkToCopy(link);
-    });
-  };
 
   const handleDownloadAssets = async (product: Product) => {
     if (!product.imageUrls?.length && !product.videoUrl) {
@@ -250,7 +303,7 @@ export default function ProductsPage() {
               )}
             </CardContent>
             <CardFooter className="p-4 pt-0 grid grid-cols-2 gap-2">
-              <Button variant="outline" className="w-full h-11" onClick={() => handleCopyLink(product.id)}>
+              <Button variant="outline" className="w-full h-11" onClick={() => setProductToGetLink(product)}>
                 <LinkIcon className="me-2 h-4 w-4" />
                 نسخ رابط
               </Button>
@@ -311,36 +364,11 @@ export default function ProductsPage() {
         )}
       </div>
 
-      <Dialog open={!!linkToCopy} onOpenChange={(open) => !open && setLinkToCopy(null)}>
-        <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>انسخ رابط التسويق</DialogTitle>
-              <DialogDescription>
-                لم نتمكن من النسخ تلقائياً بسبب قيود المتصفح. الرجاء نسخ الرابط يدوياً من الحقل أدناه.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="fallback-link" className="sr-only">Link</Label>
-              <Input
-                  id="fallback-link"
-                  defaultValue={linkToCopy || ''}
-                  readOnly
-                  onFocus={(e) => e.target.select()}
-                  className="text-left"
-                  dir="ltr"
-              />
-            </div>
-            <DialogFooter className="sm:justify-start mt-4">
-              <DialogClose asChild>
-                  <Button type="button" variant="secondary">
-                  إغلاق
-                  </Button>
-              </DialogClose>
-            </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CopyLinkDialog
+        product={productToGetLink}
+        isOpen={!!productToGetLink}
+        onOpenChange={(open) => !open && setProductToGetLink(null)}
+      />
     </div>
   );
 }
-
-    
