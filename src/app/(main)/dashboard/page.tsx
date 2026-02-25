@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DollarSign, CheckCircle, XCircle, Users, Copy, Trophy, Gift } from "lucide-react";
 import { useFirestore, useUser, useMemoFirebase, useCollection, errorEmitter, FirestorePermissionError } from "@/firebase";
-import { collection, query, doc, updateDoc } from "firebase/firestore";
+import { collection, query, doc, updateDoc, where } from "firebase/firestore";
 import type { Order, UserProfile } from "@/lib/types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -43,7 +43,8 @@ export default function DashboardPage() {
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
         return query(
-          collection(firestore, `users/${user.uid}/orders`)
+          collection(firestore, 'orders'),
+          where('dropshipperId', '==', user.uid)
         );
       }, [firestore, user]);
     
@@ -91,15 +92,14 @@ export default function DashboardPage() {
         salesChartData,
         recentSales,
     } = useMemo(() => {
-        if (!orders) {
-            return {
-                totalProfit: 0,
-                completedOrders: 0,
-                returnedOrders: 0,
-                salesChartData: [],
-                recentSales: []
-            };
-        }
+        const fallback = {
+            totalProfit: 0,
+            completedOrders: 0,
+            returnedOrders: 0,
+            salesChartData: [],
+            recentSales: []
+        };
+        if (!orders) return fallback;
         
         const sortedOrders = [...orders].sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
 
@@ -113,23 +113,25 @@ export default function DashboardPage() {
             }
             return acc;
         }, { totalProfit: 0, completedOrders: 0, returnedOrders: 0 });
-
+        
         const monthlyProfits = sortedOrders.filter(o => o.status === 'Delivered').reduce((acc, order) => {
             const date = order.createdAt?.toDate?.();
             if (!date) return acc;
-
-            const month = new Date(date).toLocaleString('ar-EG', { month: 'short' });
+            
+            // Consistent formatting on both server and client
+            const month = date.toLocaleDateString('en-US', { month: 'short' }); 
             if (!acc[month]) {
               acc[month] = 0;
             }
             acc[month] += order.totalCommission || 0;
             return acc;
           }, {} as {[key: string]: number});
-    
-        const chartData = Object.keys(monthlyProfits).map(month => ({
-            name: month,
-            total: monthlyProfits[month],
+          
+        const chartData = Object.entries(monthlyProfits).map(([name, total]) => ({
+            name,
+            total,
         })).reverse();
+
 
         const recentSalesData = sortedOrders.slice(0, 5).map(order => ({
             id: order.id,
@@ -251,5 +253,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

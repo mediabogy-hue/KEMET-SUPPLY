@@ -12,6 +12,35 @@ import { useAuth } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useEffect } from 'react';
 
+const FullPageLoader = () => (
+     <div className="flex min-h-screen w-full items-center justify-center bg-background">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <svg
+            className="h-5 w-5 animate-spin text-primary"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          <span>جاري التحميل...</span>
+        </div>
+      </div>
+);
+
+
 const AuthErrorState = ({ error }: { error: string }) => {
     const auth = useAuth();
     return (
@@ -70,21 +99,19 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
   }, [isLoading, user, role, pathname, router, isPublicPath]);
 
   if (isLoading) {
-    return null;
+    return <FullPageLoader />;
   }
   
   if (error) {
     return <AuthErrorState error={error} />;
   }
 
-  if (!user && !isPublicPath) {
-     return null;
-  }
-  if (user && role && isPublicPath && !pathname.startsWith('/product')) {
-     return null;
-  }
-   if (user && role && !hasPermission(role, pathname)) {
-     return null;
+  // If we are still figuring out where to go, show a loader.
+  // This prevents rendering children that are about to be unmounted by a redirect.
+  if ((!user && !isPublicPath) || 
+      (user && role && isPublicPath && !pathname.startsWith('/product')) || 
+      (user && role && !hasPermission(role, pathname))) {
+     return <FullPageLoader />;
   }
 
   return <>{children}</>;

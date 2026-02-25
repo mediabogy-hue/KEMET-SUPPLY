@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useState, useEffect, useMemo, useCallback, useContext } from 'react';
@@ -49,14 +50,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       if (docSnap.exists()) {
         const userProfile = docSnap.data() as UserProfile;
         if (!userProfile.role) {
-            // This is a critical data integrity issue.
             throw new Error(`User profile for ${user.uid} is missing a 'role'.`);
         }
         setProfile(userProfile);
       } else {
-        // This case should ideally not happen for a logged-in user if registration is correct.
-        // It indicates a severe data inconsistency.
-        throw new Error(`User profile document not found for user ${user.uid}. The user may be in an inconsistent state.`);
+        // Auto-create profile if it doesn't exist
+        const defaultProfile: UserProfile = {
+            id: user.uid,
+            email: user.email || 'no-email@error.com',
+            firstName: user.displayName?.split(' ')[0] || 'New',
+            lastName: user.displayName?.split(' ')[1] || 'User',
+            role: 'Dropshipper', // Default role
+            isActive: true,
+            createdAt: serverTimestamp() as any,
+            updatedAt: serverTimestamp() as any,
+        };
+        await setDoc(userDocRef, defaultProfile);
+        setProfile(defaultProfile);
       }
     } catch (e: any) {
       console.error("SessionProvider Error (fetchProfile):", e);

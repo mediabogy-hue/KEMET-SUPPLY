@@ -284,7 +284,7 @@ export default function ReportsPage() {
 
     useEffect(() => {
         if (!isLoading && !isDropshipper) {
-            router.replace('/dashboard');
+            router.replace('/admin/dashboard');
         }
     }, [isLoading, isDropshipper, router]);
 
@@ -338,5 +338,3 @@ export default function ReportsPage() {
     
     return <ReportsContent />;
 }
-
-    

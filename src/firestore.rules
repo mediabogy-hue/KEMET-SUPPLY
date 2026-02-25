@@ -20,13 +20,15 @@ service cloud.firestore {
     }
 
     function isOrdersManager() {
-        return exists(/databases/$(database)/documents/roles_orders_manager/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/roles_orders_manager/$(request.auth.uid));
     }
+
     function isFinanceManager() {
-        return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid));
     }
+
     function isProductManager() {
-        return exists(/databases/$(database)/documents/roles_product_manager/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/roles_product_manager/$(request.auth.uid));
     }
 
     function isStaff() {
@@ -43,7 +45,7 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       // User can read their own doc, Staff can read any user doc.
       allow get: if isOwner(userId) || isStaff();
-      // Only staff can list all users. This query is limited in the UI.
+      // Only staff can list all users.
       allow list: if isStaff();
       // User can update their own doc, Admins can update any doc.
       allow update: if isOwner(userId) || isStaff();
@@ -63,10 +65,8 @@ service cloud.firestore {
     // ORDERS (Global)
     match /orders/{orderId} {
       allow get: if isStaff() || isOwner(resource.data.dropshipperId);
-      // Let any authenticated user list orders; the query will be filtered by `dropshipperId` on the client.
-      // Staff roles will query without this filter. This rule allows admin-level queries to succeed.
-      allow list: if isSignedIn();
-      allow create: if isSignedIn(); // Anyone signed in can create an order.
+      allow list: if isStaff(); // Admins can list all. Dropshippers must query with a `where` clause.
+      allow create: if isOwner(request.resource.data.dropshipperId);
       allow update: if isStaff() || isOwner(resource.data.dropshipperId);
       allow delete: if isAdmin();
     }
@@ -74,7 +74,7 @@ service cloud.firestore {
     // WITHDRAWAL REQUESTS (Global)
     match /withdrawalRequests/{requestId} {
        allow get: if isStaff() || isOwner(resource.data.userId);
-       allow list: if isSignedIn(); // UI guards prevent non-staff access. This allows admin queries.
+       allow list: if isStaff();
        allow create: if isOwner(request.resource.data.userId);
        allow update, delete: if isStaff();
     }
@@ -82,7 +82,7 @@ service cloud.firestore {
     // PAYMENTS (Global)
     match /payments/{paymentId} {
       allow get: if isStaff() || isOwner(resource.data.dropshipperId);
-      allow list: if isSignedIn(); // UI guards prevent non-staff access. This allows admin queries.
+      allow list: if isStaff();
       allow create: if isOwner(request.resource.data.dropshipperId);
       allow update, delete: if isStaff();
     }
@@ -90,6 +90,7 @@ service cloud.firestore {
     // PRODUCTS
     match /products/{productId} {
       allow read: if isSignedIn();
+      allow list: if isSignedIn();
       allow create, update, delete: if isStaff();
 
        match /clicks/{clickId} {
@@ -100,14 +101,15 @@ service cloud.firestore {
 
     // PUBLIC & ADMIN-ONLY COLLECTIONS
     match /productCategories/{categoryId} {
-      allow read: if isSignedIn();
+      allow read, list: if isSignedIn();
       allow write: if isStaff();
     }
     match /shipments/{shipmentId} {
-        allow read: if isSignedIn();
+        allow read, list: if isStaff();
         allow write: if isStaff();
         match /events/{eventId} {
-            allow read, write: if isStaff();
+            allow read, list: if isStaff();
+            allow write: if isStaff();
         }
     }
     match /stockLedger/{ledgerId} {
@@ -115,7 +117,7 @@ service cloud.firestore {
       allow create, update, delete: if isStaff();
     }
     match /paymentMethods/{methodId} {
-        allow read: if isSignedIn();
+        allow read, list: if isSignedIn();
         allow write: if isStaff();
     }
     match /publicSettings/data {
