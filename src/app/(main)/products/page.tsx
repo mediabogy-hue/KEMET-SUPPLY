@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Link as LinkIcon, Box, CircleDollarSign, Download, Loader2, Search } from "lucide-react";
+import { Link as LinkIcon, Box, CircleDollarSign, Download, Loader2, Search, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useUser, useFirestore } from "@/firebase";
 import { collection, query, where, getDocs, orderBy, limit, startAfter, DocumentSnapshot, documentId } from "firebase/firestore";
@@ -15,6 +15,15 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { downloadAsset } from "@/lib/utils";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { CategoryBrowser } from "./_components/category-browser";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 const PAGE_SIZE = 8;
 
@@ -32,6 +41,7 @@ export default function ProductsPage() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [linkToCopy, setLinkToCopy] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async (loadMore = false) => {
     if (!firestore || !user) return;
@@ -121,11 +131,8 @@ export default function ProductsPage() {
       });
     }).catch(err => {
       console.error('Failed to copy: ', err);
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "لم يتمكن المتصفح من نسخ الرابط.",
-      });
+      // Fallback to showing the dialog
+      setLinkToCopy(link);
     });
   };
 
@@ -303,6 +310,45 @@ export default function ProductsPage() {
         )}
       </div>
 
+       <Dialog open={!!linkToCopy} onOpenChange={(open) => !open && setLinkToCopy(null)}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+            <DialogTitle>انسخ رابط التسويق</DialogTitle>
+            <DialogDescription>
+                لم نتمكن من نسخ الرابط تلقائيًا. الرجاء نسخه يدويًا من الحقل أدناه.
+            </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center space-x-2 gap-2" dir="ltr">
+            <Input
+                defaultValue={linkToCopy || ''}
+                readOnly
+                onFocus={(e) => e.target.select()}
+                className="text-left"
+            />
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => {
+                if(linkToCopy) {
+                    navigator.clipboard.writeText(linkToCopy).then(() => {
+                        toast({ title: "تم النسخ بنجاح!" });
+                    }).catch(() => {
+                        toast({ variant: 'destructive', title: "فشل النسخ" });
+                    })
+                }
+            }}>
+                <Copy className="h-4 w-4" />
+            </Button>
+            </div>
+            <DialogFooter className="sm:justify-start mt-4">
+            <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                إغلاق
+                </Button>
+            </DialogClose>
+            </DialogFooter>
+        </DialogContent>
+        </Dialog>
+
     </div>
   );
 }
+
+    
