@@ -124,12 +124,12 @@ export default function AdminOrdersPage() {
     
     // Admins and OrdersManagers see all orders from the global collection
     if (isAdmin || isOrdersManager) {
-        return query(collection(firestore, 'adminOrders'), orderBy('createdAt', 'desc'), limit(200));
+        return query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(200));
     }
     
     // ProductManagers (Merchants) see orders only for their products
     if (isProductManager) {
-        return query(collection(firestore, 'adminOrders'), where('merchantId', '==', user.uid), orderBy('createdAt', 'desc'), limit(200));
+        return query(collection(firestore, 'orders'), where('merchantId', '==', user.uid), orderBy('createdAt', 'desc'), limit(200));
     }
     
     return null;
@@ -204,10 +204,7 @@ export default function AdminOrdersPage() {
     setAllOrders(prevOrders => (prevOrders || []).map(o => o.id === order.id ? { ...o, status: newStatus } : o));
     toast({ title: "جاري تحديث حالة الطلب..." });
 
-    const batch = writeBatch(firestore);
-    const dropshipperOrderRef = doc(firestore, `users/${order.dropshipperId}/orders`, order.id);
-    const adminOrderRef = doc(firestore, `adminOrders`, order.id);
-
+    const orderRef = doc(firestore, `orders`, order.id);
 
     try {
         if (newStatus === 'Confirmed') {
@@ -218,8 +215,7 @@ export default function AdminOrdersPage() {
             }
             await runTransaction(firestore, async (transaction) => {
                 const productRef = doc(firestore, 'products', order.productId);
-                // We check the admin copy for existence but might need user copy depending on rules
-                const orderDoc = await transaction.get(adminOrderRef); 
+                const orderDoc = await transaction.get(orderRef); 
                 const productDoc = await transaction.get(productRef);
 
                 if (!orderDoc.exists()) throw new Error("لم يتم العثور على الطلب.");
@@ -237,9 +233,7 @@ export default function AdminOrdersPage() {
                         item: { productId: productData.id, needed: orderData.quantity, available: productData.stockQuantity }
                     };
                     
-                    const errorUpdate = { stockError };
-                    transaction.update(dropshipperOrderRef, errorUpdate);
-                    transaction.update(adminOrderRef, errorUpdate);
+                    transaction.update(orderRef, { stockError });
                     
                     throw new Error(stockError.message);
                 }
@@ -254,19 +248,16 @@ export default function AdminOrdersPage() {
                     actor: { userId: user.uid, role: role },
                 });
                 
-                const statusUpdate = {
+                transaction.update(orderRef, {
                     status: 'Confirmed', confirmedAt: serverTimestamp(),
                     confirmedBy: { userId: user.uid, role: role },
                     stockApplied: true, stockAppliedAt: serverTimestamp(), stockError: null,
-                };
-                transaction.update(dropshipperOrderRef, statusUpdate);
-                transaction.update(adminOrderRef, statusUpdate);
+                });
             });
             toast({ title: "تم تأكيد الطلب وخصم المخزون بنجاح!" });
         } else if (newStatus === 'Canceled' || newStatus === 'Returned') {
             await runTransaction(firestore, async (transaction) => {
-                // Fetch the latest state of the order within the transaction
-                const orderDoc = await transaction.get(adminOrderRef);
+                const orderDoc = await transaction.get(orderRef);
                 if (!orderDoc.exists()) throw new Error("لم يتم العثور على الطلب.");
                 
                 const orderData = orderDoc.data() as Order;
@@ -290,15 +281,11 @@ export default function AdminOrdersPage() {
                     statusAndStockUpdate.stockRestored = true;
                 }
                 
-                transaction.update(dropshipperOrderRef, statusAndStockUpdate);
-                transaction.update(adminOrderRef, statusAndStockUpdate);
+                transaction.update(orderRef, statusAndStockUpdate);
             });
             toast({ title: `تم تحديث حالة الطلب إلى "${statusText[newStatus]}"` });
         } else {
-            const statusUpdate = { status: newStatus, updatedAt: serverTimestamp() };
-            batch.update(dropshipperOrderRef, statusUpdate);
-            batch.update(adminOrderRef, statusUpdate);
-            await batch.commit();
+            await updateDoc(orderRef, { status: newStatus, updatedAt: serverTimestamp() });
             toast({ title: "تم تحديث حالة الطلب بنجاح" });
         }
 
@@ -333,21 +320,16 @@ export default function AdminOrdersPage() {
     setAllOrders(prev => (prev || []).filter(o => o.id !== orderToDeleteCache.id));
     setOrderToDelete(null); 
     
-    const batch = writeBatch(firestore);
-    const dropshipperOrderRef = doc(firestore, `users/${orderToDeleteCache.dropshipperId}/orders`, orderToDeleteCache.id);
-    const adminOrderRef = doc(firestore, `adminOrders`, orderToDeleteCache.id);
-
-    batch.delete(dropshipperOrderRef);
-    batch.delete(adminOrderRef);
+    const orderRef = doc(firestore, 'orders', orderToDeleteCache.id);
     
-    batch.commit()
+    deleteDoc(orderRef)
         .then(() => {
             toast({ title: "تم حذف الطلب بنجاح" });
         })
         .catch(async (error) => {
             setAllOrders(originalOrders);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: `batch delete for order ${orderToDeleteCache.id}`,
+                path: orderRef.path,
                 operation: 'delete',
             }));
             toast({ variant: "destructive", title: "فشل حذف الطلب", description: "قد لا تملك الصلاحيات الكافية." });
@@ -745,5 +727,3 @@ export default function AdminOrdersPage() {
     </TooltipProvider>
   );
 }
-
-    

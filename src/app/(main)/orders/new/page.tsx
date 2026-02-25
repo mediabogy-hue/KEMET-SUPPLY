@@ -70,12 +70,11 @@ export default function NewOrderPage() {
       return;
     }
 
-    const newOrderRef = doc(collection(firestore, `users/${user.uid}/orders`));
-    const adminOrderRef = doc(collection(firestore, 'orders'), newOrderRef.id);
+    const orderRef = doc(collection(firestore, "orders"));
     const dropshipperName = `${userProfile.firstName} ${userProfile.lastName}`.trim() || user.displayName || 'مسوق';
 
     const orderData: any = {
-      id: newOrderRef.id,
+      id: orderRef.id,
       dropshipperId: user.uid,
       dropshipperName,
       customerName: data.customerName,
@@ -103,18 +102,14 @@ export default function NewOrderPage() {
       orderData.merchantInfo = selectedProduct.merchantInfo;
     }
 
-    const batch = writeBatch(firestore);
-    batch.set(newOrderRef, orderData);
-    batch.set(adminOrderRef, { ...orderData, _originalPath: newOrderRef.path });
-
-    batch.commit()
+    setDoc(orderRef, orderData)
       .then(() => {
         toast({ title: "تم إنشاء الطلب بنجاح!" });
         router.push("/orders");
       })
       .catch(error => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: newOrderRef.path,
+          path: orderRef.path,
           operation: 'create',
           requestResourceData: orderData
         }));

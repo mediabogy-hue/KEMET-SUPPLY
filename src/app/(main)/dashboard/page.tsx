@@ -50,8 +50,7 @@ export default function DashboardPage() {
 
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
-        // Correctly query the nested collection for the logged-in user
-        return query(collection(firestore, 'users', user.uid, 'orders'));
+        return query(collection(firestore, 'orders'), where('dropshipperId', '==', user.uid));
     }, [firestore, user]);
     
     const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);

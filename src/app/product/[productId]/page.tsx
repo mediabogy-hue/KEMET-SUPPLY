@@ -257,8 +257,7 @@ export default function PublicProductPage() {
             return;
         }
     
-        const dropshipperOrderRef = doc(collection(firestore, `users/${dropshipperId}/orders`));
-        const adminOrderRef = doc(collection(firestore, 'adminOrders'), dropshipperOrderRef.id);
+        const orderRef = doc(collection(firestore, 'orders'));
         
         let dropshipperName = 'مسوق';
         try {
@@ -271,10 +270,8 @@ export default function PublicProductPage() {
             console.warn("Could not fetch dropshipper name", e);
         }
 
-        const batch = writeBatch(firestore);
-
         const orderData: Partial<Order> = {
-            id: dropshipperOrderRef.id,
+            id: orderRef.id,
             dropshipperId,
             dropshipperName,
             customerName: data.customerName,
@@ -307,12 +304,10 @@ export default function PublicProductPage() {
                 referenceNumber: data.referenceNumber,
             };
         }
-
-        // Write to both user's subcollection and admin's global collection
-        batch.set(dropshipperOrderRef, orderData);
-        batch.set(adminOrderRef, {...orderData, _originalPath: dropshipperOrderRef.path});
     
         try {
+            await setDoc(orderRef, orderData);
+
             // Create a record for the referred customer
             if (dropshipperId) {
                 const customerRef = doc(firestore, `marketingCustomers/${data.customerPhone}`);
@@ -326,10 +321,8 @@ export default function PublicProductPage() {
                     lastInteractionAt: serverTimestamp() as any,
                     name: data.customerName,
                 };
-                 batch.set(customerRef, { ...customerData, createdAt: serverTimestamp() }, { merge: true });
+                 await setDoc(customerRef, { ...customerData, createdAt: serverTimestamp() }, { merge: true });
             }
-
-            await batch.commit();
             
             setOrderSuccess(true);
             toast({
@@ -340,7 +333,7 @@ export default function PublicProductPage() {
         } catch (error) {
             console.error("Order submission error:", error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-               path: dropshipperOrderRef.path,
+               path: orderRef.path,
                operation: 'create',
                requestResourceData: orderData
            }));

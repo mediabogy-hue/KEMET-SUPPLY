@@ -71,7 +71,7 @@ export default function AdminReportsPage() {
     const canAccess = !isRoleLoading && isAdmin;
 
     const usersQuery = useMemoFirebase(() => (firestore && canAccess) ? query(collection(firestore, 'users')) : null, [firestore, canAccess]);
-    const ordersQuery = useMemoFirebase(() => (firestore && canAccess) ? query(collection(firestore, 'adminOrders'), orderBy('createdAt', 'desc')) : null, [firestore, canAccess]);
+    const ordersQuery = useMemoFirebase(() => (firestore && canAccess) ? query(collection(firestore, 'orders'), orderBy('createdAt', 'desc')) : null, [firestore, canAccess]);
     const productsQuery = useMemoFirebase(() => (firestore && canAccess) ? query(collection(firestore, 'products')) : null, [firestore, canAccess]);
     
     const { data: users, isLoading: usersLoading } = useCollection<UserProfile>(usersQuery);
@@ -244,5 +244,3 @@ export default function AdminReportsPage() {
         </div>
     );
 }
-
-    

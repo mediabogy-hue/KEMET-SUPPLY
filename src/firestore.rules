@@ -49,16 +49,6 @@ service cloud.firestore {
       allow update: if isOwner(userId) || isStaff();
       allow delete: if isAdmin();
       
-      // Dropshipper orders are nested under their user document
-      match /orders/{orderId} {
-          allow read: if isOwner(userId) || isStaff();
-          allow list: if isOwner(userId) || isStaff();
-          // Allow creation by the owner OR by a public page if the dropshipperId in the order matches the owner
-          allow create: if isOwner(userId) || request.resource.data.dropshipperId == userId;
-          allow update: if isStaff(); // Only staff can update orders from a user's subcollection
-          allow delete: if isAdmin();
-      }
-      
        match /withdrawalRequests/{requestId} {
         allow read, write: if isOwner(userId) || isStaff();
       }
@@ -74,14 +64,19 @@ service cloud.firestore {
       }
     }
     
-    // --- GLOBAL ADMIN COLLECTIONS ---
-    // These are denormalized copies for fast admin queries.
-    // They are written to via batch writes, and rules here are for direct access.
-    
-    match /adminOrders/{orderId} {
-      // Allow creation by a logged-in user or a public page (auth is null)
-      allow create: if true; 
-      allow read, list, update, delete: if isStaff();
+    // --- GLOBAL COLLECTIONS ---
+     match /orders/{orderId} {
+      // Allow creation by a logged-in dropshipper for themselves, or by anyone (public page)
+      allow create: if (request.auth.uid == request.resource.data.dropshipperId) || (request.auth == null);
+      // Allow staff to read any order, and dropshippers to read their own orders.
+      allow read: if isStaff() || (resource.data.dropshipperId == request.auth.uid);
+      // Allow staff to list all orders, and dropshippers to list only their own orders.
+      // This rule requires that dropshipper queries MUST include `where('dropshipperId', '==', request.auth.uid)`
+      allow list: if isStaff() || (request.query.where.dropshipperId == request.auth.uid);
+      // Only staff can update orders
+      allow update: if isStaff();
+      // Only admins can delete orders
+      allow delete: if isAdmin();
     }
 
     match /adminWithdrawalRequests/{requestId} {
@@ -93,13 +88,6 @@ service cloud.firestore {
        allow create: if isSignedIn();
     }
     
-    // This allows staff to query across all users' orders for specific analytics if needed,
-    // though primary admin views should use the /adminOrders collection.
-    match /{path=**}/orders/{orderId} {
-        allow list: if isStaff();
-    }
-    
-    // --- OTHER GLOBAL COLLECTIONS ---
     match /products/{productId} {
       allow read: if true;
       allow list: if isSignedIn();
@@ -179,5 +167,3 @@ service cloud.firestore {
     match /automationSettings/{any} { allow read, write: if isStaff(); }
   }
 }
-
-    
