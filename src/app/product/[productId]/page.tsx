@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
@@ -44,6 +45,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { governorates } from '@/lib/governorates';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 
 
 
@@ -248,7 +258,8 @@ export default function PublicProductPage() {
         }
     
         const newOrderId = doc(collection(firestore, 'id_generator')).id;
-        const newOrderRef = doc(firestore, 'orders', newOrderId);
+        const dropshipperOrderRef = doc(firestore, 'users', dropshipperId, 'orders', newOrderId);
+        const adminOrderRef = doc(firestore, 'adminOrders', newOrderId);
     
         let dropshipperName = 'مسوق';
         try {
@@ -298,7 +309,9 @@ export default function PublicProductPage() {
             };
         }
 
-        batch.set(newOrderRef, orderData);
+        // Write to both user's subcollection and admin's global collection
+        batch.set(dropshipperOrderRef, orderData);
+        batch.set(adminOrderRef, orderData);
     
         try {
             // Create a record for the referred customer
@@ -328,7 +341,7 @@ export default function PublicProductPage() {
         } catch (error) {
             console.error("Order submission error:", error);
             errorEmitter.emit('permission-error', new FirestorePermissionError({
-               path: newOrderRef.path,
+               path: dropshipperOrderRef.path,
                operation: 'create',
                requestResourceData: orderData
            }));
