@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
-import { useFirebase } from '@/firebase/provider';
+import { useFirebase } from '@/firebase';
 import { UserProfile } from '@/lib/types';
 import { useRouter, usePathname } from 'next/navigation';
 import { getDefaultPath, hasPermission } from './permissions';
