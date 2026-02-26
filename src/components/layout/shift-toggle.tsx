@@ -11,7 +11,7 @@ import { Play, Square } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function ShiftToggle() {
-    const { user, profile, refreshSession } = useSession();
+    const { user, profile } = useSession();
     const firestore = useFirestore();
     const { toast } = useToast();
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -53,8 +53,7 @@ export function ShiftToggle() {
 
         try {
             await batch.commit();
-            // Refresh the session to get the latest profile state
-            refreshSession();
+            // The onSnapshot listener in SessionProvider will automatically update the UI.
         } catch (error) {
             console.error("Failed to toggle shift:", error);
             toast({ variant: 'destructive', title: 'فشل تغيير حالة الوردية' });

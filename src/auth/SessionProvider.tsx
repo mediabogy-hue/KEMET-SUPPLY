@@ -6,7 +6,7 @@ import type { FirebaseApp } from 'firebase/app';
 import { Firestore, doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import type { Storage } from 'firebase/storage';
-import { app, auth, db, storage } from '@/lib/firebaseClient'; // Direct import of initialized services
+import { app, auth, db, storage } from '@/lib/firebaseClient';
 import type { UserProfile } from '@/lib/types';
 import { Rocket } from 'lucide-react';
 
@@ -15,13 +15,11 @@ export interface SessionContextState {
   firestore: Firestore;
   auth: Auth;
   storage: Storage;
-  
   user: User | null;
   profile: UserProfile | null;
   role: UserProfile['role'] | null;
   isLoading: boolean;
   error: Error | null;
-
   isAdmin: boolean;
   isOrdersManager: boolean;
   isFinanceManager: boolean;
@@ -33,65 +31,70 @@ export interface SessionContextState {
 const SessionContext = createContext<SessionContextState | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [sessionState, setSessionState] = useState<{
-    user: User | null;
-    profile: UserProfile | null;
-    isLoading: boolean;
-    error: Error | null;
-  }>({
-    user: auth.currentUser, // Initialize with current user if available on client
-    profile: null,
-    isLoading: true,
-    error: null,
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Always start as loading
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    let profileUnsubscribe: Unsubscribe | null = null;
-
     const authUnsubscribe = onAuthStateChanged(auth, (authUser) => {
-      if (profileUnsubscribe) {
-        profileUnsubscribe();
+      // If a user logs out, authUser will be null
+      if (!authUser) {
+        setUser(null);
+        setProfile(null);
+        setIsLoading(false);
+        setError(null);
+        return;
       }
 
-      if (authUser) {
-        if (sessionState.user?.uid !== authUser.uid) {
-             setSessionState(s => ({ ...s, isLoading: true, user: authUser, profile: null }));
-        }
+      // If a user logs in (or is already logged in)
+      setUser(authUser);
 
-        const profileDocRef = doc(db, 'users', authUser.uid);
-        profileUnsubscribe = onSnapshot(profileDocRef, 
-          (docSnap) => {
-            if (docSnap.exists()) {
-              setSessionState({ user: authUser, profile: docSnap.data() as UserProfile, isLoading: false, error: null });
-            } else {
-              setSessionState({ user: authUser, profile: null, isLoading: false, error: new Error('User profile not found.') });
-            }
-          },
-          (profileError) => {
-            console.error("Profile subscription error:", profileError);
-            setSessionState({ user: authUser, profile: null, isLoading: false, error: profileError });
+      // Now, subscribe to their profile document in real-time
+      const profileDocRef = doc(db, 'users', authUser.uid);
+      const profileUnsubscribe = onSnapshot(profileDocRef,
+        (docSnap) => {
+          if (docSnap.exists()) {
+            setProfile(docSnap.data() as UserProfile);
+            setError(null);
+          } else {
+            setProfile(null);
+            setError(new Error('User profile not found.'));
           }
-        );
-      } else {
-        setSessionState({ user: null, profile: null, isLoading: false, error: null });
-      }
+          setIsLoading(false);
+        },
+        (profileError) => {
+          console.error("Profile subscription error:", profileError);
+          setProfile(null);
+          setError(profileError);
+          setIsLoading(false);
+        }
+      );
+
+      // Return a cleanup function for the profile subscription when authUser changes
+      return () => profileUnsubscribe();
+
     }, (authError) => {
+      // Handle errors from the auth listener itself
       console.error("Auth state error:", authError);
-      setSessionState({ user: null, profile: null, isLoading: false, error: authError });
+      setUser(null);
+      setProfile(null);
+      setError(authError);
+      setIsLoading(false);
     });
 
-    return () => {
-      authUnsubscribe();
-      if (profileUnsubscribe) {
-        profileUnsubscribe();
-      }
-    };
-  }, []); // Run only once
+    // Return the cleanup function for the auth listener
+    return () => authUnsubscribe();
+
+  }, []); // Empty dependency array ensures this effect runs only once on mount
 
   const contextValue = useMemo((): SessionContextState => {
-    const role = sessionState.profile?.role || null;
+    const role = profile?.role || null;
     return {
-      ...sessionState,
+      user,
+      profile,
+      isLoading,
+      error,
       firebaseApp: app,
       firestore: db,
       auth: auth,
@@ -104,7 +107,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(role || ''),
       isDropshipper: role === 'Dropshipper',
     };
-  }, [sessionState]);
+  }, [user, profile, isLoading, error]);
 
   return (
     <SessionContext.Provider value={contextValue}>
@@ -120,4 +123,3 @@ export const useSession = (): SessionContextState => {
   }
   return context;
 };
-    
