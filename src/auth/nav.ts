@@ -1,7 +1,6 @@
-
 import React from "react";
 import {
-  LayoutDashboard, Box, ShoppingCart, Users, Settings, FileText,
+  LayoutDashboard, Box, ShoppingCart, Users, Settings, FileText, BarChart, ShieldCheck, DollarSign, Truck
 } from "lucide-react";
 import type { UserRole } from "./permissions";
 
@@ -38,7 +37,14 @@ export const navLinks: NavLink[] = [
         icon: React.createElement(FileText),
         roles: ['Dropshipper'],
     },
-    // Admin Links
+     {
+        href: "/policy",
+        label: "سياسة السحب",
+        icon: React.createElement(ShieldCheck),
+        roles: ['Dropshipper'],
+    },
+
+    // Admin & Staff Links
     {
         href: "/admin/dashboard",
         label: "لوحة التحكم",
@@ -58,8 +64,56 @@ export const navLinks: NavLink[] = [
         roles: ['Admin', 'ProductManager'],
     },
     {
+        href: "/admin/categories",
+        label: "الفئات",
+        icon: React.createElement(FileText),
+        roles: ['Admin', 'ProductManager'],
+    },
+    {
+        href: "/admin/inventory",
+        label: "المخزون",
+        icon: React.createElement(BarChart),
+        roles: ['Admin', 'ProductManager'],
+    },
+    {
         href: "/admin/users",
         label: "إدارة المستخدمين",
+        icon: React.createElement(Users),
+        roles: ['Admin'],
+    },
+     {
+        href: "/admin/withdrawals",
+        label: "طلبات السحب",
+        icon: React.createElement(DollarSign),
+        roles: ['Admin', 'FinanceManager'],
+    },
+    {
+        href: "/admin/payments",
+        label: "تأكيد الدفع",
+        icon: React.createElement(DollarSign),
+        roles: ['Admin', 'FinanceManager'],
+    },
+    {
+        href: "/admin/shipping",
+        label: "الشحن والتوصيل",
+        icon: React.createElement(Truck),
+        roles: ['Admin', 'OrdersManager'],
+    },
+     {
+        href: "/admin/reports",
+        label: "التقارير",
+        icon: React.createElement(FileText),
+        roles: ['Admin'],
+    },
+    {
+        href: "/admin/logs",
+        label: "سجل النشاط",
+        icon: React.createElement(FileText),
+        roles: ['Admin'],
+    },
+     {
+        href: "/admin/marketing",
+        label: "التسويق الآلي",
         icon: React.createElement(Users),
         roles: ['Admin'],
     },

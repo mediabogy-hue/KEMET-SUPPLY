@@ -1,16 +1,24 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+'use client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useSession } from "@/auth/SessionProvider";
 
 export default function AdminDashboardPage() {
+    const { profile } = useSession();
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-4">Admin Dashboard</h1>
+    <div className="space-y-4">
+      <h1 className="text-3xl font-bold mb-4">
+        مرحباً بك، {profile?.firstName || 'الأدمن'}!
+      </h1>
       <Card>
         <CardHeader>
-          <CardTitle>Admin Area</CardTitle>
+          <CardTitle>لوحة تحكم الأدمن</CardTitle>
+          <CardDescription>
+            من هنا يمكنك إدارة جميع جوانب المنصة.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p>This is the new admin dashboard. The project has been reset.</p>
+          <p>تم إعادة بناء هذه الصفحة. الإحصائيات والأدوات الإدارية سيتم إضافتها هنا.</p>
         </CardContent>
       </Card>
     </div>

@@ -1,23 +1,22 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 204 30% 95%;
+    --background: 204 30% 95%; /* very light, desaturated blue */
     --foreground: 210 10% 23%;
     --card: 0 0% 100%;
     --card-foreground: 210 10% 23%;
     --popover: 0 0% 100%;
     --popover-foreground: 210 10% 23%;
-    --primary: 211 60% 45%; /* #2E6BB4 */
+    --primary: 211 60% 45%; /* #2E6BB4 - medium blue */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 10% 92%;
     --secondary-foreground: 210 10% 23%;
     --muted: 210 10% 92%;
     --muted-foreground: 210 10% 45%;
-    --accent: 180 65% 58%; /* #4DD9D9 */
+    --accent: 180 65% 58%; /* #4DD9D9 - vibrant cyan */
     --accent-foreground: 210 10% 23%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;

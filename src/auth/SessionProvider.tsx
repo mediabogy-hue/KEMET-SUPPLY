@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import { UserProfile } from '@/lib/types';
 import { useRouter, usePathname } from 'next/navigation';
@@ -35,8 +35,17 @@ const loadSessionData = async (firestore: any, user: User): Promise<{ profile: U
 
     if (userDocSnap.exists()) {
         const profile = userDocSnap.data() as UserProfile;
+        // The role from the user document is the source of truth
         return { profile, role: profile.role };
     }
+    // Fallback for older accounts that might not have the role field
+    const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
+    const adminRoleSnap = await getDoc(adminRoleRef);
+    if (adminRoleSnap.exists()) {
+        const profile = { email: user.email, role: 'Admin' } as UserProfile;
+        return { profile, role: 'Admin' };
+    }
+
     return { profile: null, role: null };
 };
 
@@ -85,7 +94,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         
         if (!isPublicPage && !hasPermission(loadedRole, pathname)) {
             router.replace(defaultPath);
-        } else if (isPublicPage) {
+        } else if (isPublicPage && loadedRole) {
             router.replace(defaultPath);
         }
 
@@ -111,9 +120,9 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     error,
     isAdmin: role === 'Admin',
-    isOrdersManager: role === 'OrdersManager',
-    isFinanceManager: role === 'FinanceManager',
-    isProductManager: role === 'ProductManager',
+    isOrdersManager: role === 'OrdersManager' || role === 'Admin',
+    isFinanceManager: role === 'FinanceManager' || role === 'Admin',
+    isProductManager: role === 'ProductManager' || role === 'Admin',
     isStaff: ['Admin', 'OrdersManager', 'FinanceManager', 'ProductManager'].includes(role || ''),
     isDropshipper: role === 'Dropshipper',
     refreshSession,

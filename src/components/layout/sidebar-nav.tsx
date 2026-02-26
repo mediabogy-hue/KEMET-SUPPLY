@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
@@ -16,7 +15,7 @@ export function SidebarNav() {
   }
   
   const accessibleLinks = navLinks.filter(link => {
-    return link.roles.some(r => r === role) || role === 'Admin'
+    return link.roles.some(r => r === role)
   });
 
   return (
@@ -24,7 +23,7 @@ export function SidebarNav() {
         {accessibleLinks.map((link) => (
           <SidebarMenuItem key={link.href}>
              <Link href={link.href} passHref legacyBehavior>
-                <SidebarMenuButton tooltip={link.label} isActive={pathname.startsWith(link.href)}>
+                <SidebarMenuButton tooltip={link.label} isActive={pathname === link.href || (link.href !== '/' && pathname.startsWith(link.href))}>
                   {link.icon}
                   <span className="truncate">{link.label}</span>
                 </SidebarMenuButton>

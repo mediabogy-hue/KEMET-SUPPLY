@@ -1,21 +1,23 @@
 
 'use client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-
-// This page's content has been merged into the new Catalog page (/admin/products)
-// This component now just redirects to the new centralized page.
-export default function CategoriesRedirectPage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace('/admin/products');
-  }, [router]);
+export default function AdminCategoriesPage() {
 
   return (
-    <div className="flex h-full w-full items-center justify-center">
-      <p>جاري التوجيه إلى صفحة الكتالوج الجديدة...</p>
+    <div className="space-y-4">
+      <h1 className="text-3xl font-bold mb-4">
+        إدارة الفئات
+      </h1>
+      <Card>
+        <CardHeader>
+          <CardTitle>قائمة الفئات</CardTitle>
+          <CardDescription>هنا يمكنك إضافة وتعديل فئات المنتجات.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p>تم إعادة بناء هذه الصفحة. المحتوى سيتم إضافته هنا.</p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

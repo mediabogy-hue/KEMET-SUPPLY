@@ -1,16 +1,23 @@
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+'use client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useSession } from "@/auth/SessionProvider";
 
 export default function DashboardPage() {
+  const { profile } = useSession();
+
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-4">Dashboard</h1>
+    <div className="space-y-4">
+      <h1 className="text-3xl font-bold mb-4">
+        مرحباً بك، {profile?.firstName || 'المسوق'}!
+      </h1>
       <Card>
         <CardHeader>
-          <CardTitle>Welcome Back</CardTitle>
+          <CardTitle>لوحة التحكم</CardTitle>
+          <CardDescription>هذه هي لوحة التحكم الخاصة بك. يمكنك من هنا متابعة أداءك.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p>This is your new dashboard. The project has been reset.</p>
+          <p>تم إعادة بناء هذه الصفحة. المحتوى والإحصائيات سيتم إضافتهم هنا.</p>
         </CardContent>
       </Card>
     </div>

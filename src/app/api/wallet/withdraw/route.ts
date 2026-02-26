@@ -4,6 +4,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { getAdminApp, getAdminDb } from "@/firebase/server-init";
 import { FieldValue } from "firebase-admin/firestore";
+import type { UserProfile } from "@/lib/types";
 
 export async function POST(req: Request) {
   try {
@@ -33,8 +34,16 @@ export async function POST(req: Request) {
     if (!userDoc.exists) {
         return NextResponse.json({ error: "User profile not found" }, { status: 404 });
     }
-    const userData = userDoc.data()!;
+    const userData = userDoc.data()! as UserProfile;
     const userName = `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || userData.email || 'Unknown User';
+    
+    const walletRef = getAdminDb().doc(`wallets/${userId}`);
+    const walletDoc = await walletRef.get();
+    const availableBalance = walletDoc.exists() ? walletDoc.data()?.availableBalance || 0 : 0;
+    
+    if (amount > availableBalance) {
+      return NextResponse.json({ error: "Insufficient funds." }, { status: 400 });
+    }
 
     const adminDb = getAdminDb();
     const batch = adminDb.batch();
@@ -62,6 +71,14 @@ export async function POST(req: Request) {
 
     batch.set(userWithdrawalRef, withdrawalData);
     batch.set(adminWithdrawalRef, withdrawalData);
+
+    // 3. Update the user's wallet
+    batch.update(walletRef, {
+      availableBalance: FieldValue.increment(-amount),
+      pendingWithdrawals: FieldValue.increment(amount),
+      updatedAt: FieldValue.serverTimestamp()
+    });
+
 
     await batch.commit();
 

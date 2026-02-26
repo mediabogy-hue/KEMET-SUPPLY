@@ -1,12 +1,11 @@
-
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from "@/components/ui/toaster"
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { SessionProvider } from '@/auth/SessionProvider';
 import './globals.css';
-import { PwaFeatures } from '@/components/pwa-features';
 import { cn } from '@/lib/utils';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 const fontSans = Inter({
   subsets: ['latin'],
@@ -36,9 +35,10 @@ export default function RootLayout({
       >
         <FirebaseClientProvider>
           <SessionProvider>
-            {children}
+            <SidebarProvider>
+              {children}
+            </SidebarProvider>
             <Toaster />
-            <PwaFeatures />
           </SessionProvider>
         </FirebaseClientProvider>
       </body>
