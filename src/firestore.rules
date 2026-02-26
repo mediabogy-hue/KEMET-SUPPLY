@@ -119,9 +119,10 @@ service cloud.firestore {
       // Update access: Staff can update fully. Merchants can ONLY confirm their own pending orders.
       allow update: if isOrdersManager() || 
                     (isMerchant() && 
-                      resource.data.merchantId == request.auth.uid &&
-                      resource.data.status == 'Pending' &&
-                      request.resource.data.status == 'Confirmed');
+                     resource.data.merchantId == request.auth.uid &&
+                     resource.data.status == 'Pending' &&
+                     request.resource.data.status == 'Confirmed' &&
+                     request.resource.data.keys().hasAll(['status', 'updatedAt', 'confirmedAt']));
                      
       // Delete access: Admins only.
       allow delete: if isAdmin();
@@ -154,7 +155,9 @@ service cloud.firestore {
      // Stock Ledger is append-only by authorized users or server functions
     match /stockLedger/{ledgerId} {
         function isProductOwner(productId) {
-            return get(/databases/$(database)/documents/products/$(productId)).data.merchantId == request.auth.uid;
+            let product = get(/databases/$(database)/documents/products/$(productId)).data;
+            // The merchantId field might not exist on old/non-merchant products
+            return product.keys().has('merchantId') && product.merchantId == request.auth.uid;
         }
         allow read, list: if isAdmin();
         allow create: if isAdmin() || (isMerchant() && isProductOwner(request.resource.data.productId));

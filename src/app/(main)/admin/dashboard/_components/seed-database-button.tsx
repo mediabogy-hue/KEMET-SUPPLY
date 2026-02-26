@@ -119,7 +119,7 @@ export function SeedDatabaseButton() {
                     totalAmount: randomProduct.price * quantity,
                     unitCommission: randomProduct.commission,
                     totalCommission: randomProduct.commission * quantity,
-                    status: statuses[i % statuses.length],
+                    status: i % 4 === 0 ? 'Pending' : statuses[i % statuses.length], // Ensure some are pending
                     createdAt: orderDate as any,
                     updatedAt: orderDate as any,
                     platformFee: 0,

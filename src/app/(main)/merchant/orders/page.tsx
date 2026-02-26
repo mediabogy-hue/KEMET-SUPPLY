@@ -34,10 +34,15 @@ export default function MerchantOrdersPage() {
         toast({ title: 'جاري تحديث حالة الطلب...' });
         try {
             const updateData: any = { status, updatedAt: serverTimestamp() };
-            if (status === 'Confirmed') updateData.confirmedAt = serverTimestamp();
+            if (status === 'Confirmed') {
+                updateData.confirmedAt = serverTimestamp();
+            }
 
             await updateDoc(orderRef, updateData);
-            // Success toast removed for better UX.
+            toast({
+                title: "تم تأكيد الطلب بنجاح!",
+                description: "سيقوم فريق العمل بتجهيز الشحنة."
+            })
         } catch (e) {
             console.error('Failed to update order status:', e);
             toast({ variant: 'destructive', title: 'فشل تحديث الحالة' });
