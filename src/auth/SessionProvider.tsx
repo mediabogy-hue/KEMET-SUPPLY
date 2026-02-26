@@ -1,7 +1,8 @@
+
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
-import { User, onAuthStateChanged, Unsubscribe } from 'firebase/auth';
+import { User, onAuthStateChanged, Unsubscribe, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import type { UserProfile } from '@/lib/types';
@@ -37,35 +38,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // If a profile listener is active from a previous user, unsubscribe from it.
       if (unsubscribeProfile) {
         unsubscribeProfile();
+        unsubscribeProfile = undefined;
       }
+      
+      // Every time auth state changes, reset to loading.
+      setIsLoading(true);
+      setUser(null);
+      setProfile(null);
+      setError(null);
 
       if (authUser) {
+        // User is authenticated, now try to fetch their profile.
         const profileDocRef = doc(firestore, 'users', authUser.uid);
         unsubscribeProfile = onSnapshot(profileDocRef, (docSnap) => {
-          setUser(authUser); // Set user only when we have profile info
           if (docSnap.exists()) {
+            // SUCCESS: We have an auth user and a profile. The session is valid.
+            setUser(authUser);
             setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             setError(null);
+            setIsLoading(false); // We have a stable, valid session.
           } else {
-            setProfile(null);
-            setError(new Error('User profile does not exist in Firestore.'));
+            // CRITICAL ERROR: Auth user exists but no profile document.
+            // This account is in a broken state. Log the user out to prevent infinite loops/broken UI.
+            console.error(`User with UID ${authUser.uid} is authenticated but has no profile document. Forcing sign out.`);
+            signOut(auth); // This triggers onAuthStateChanged again, leading to the "logged out" state.
           }
-          setIsLoading(false);
         }, (profileError) => {
-          console.error("Profile snapshot error:", profileError);
-          setUser(authUser);
-          setProfile(null);
+          // CRITICAL ERROR: Failed to read profile document (e.g., permission denied).
+          // Log the user out.
+          console.error("Profile snapshot error, forcing sign out:", profileError);
           setError(profileError);
-          setIsLoading(false);
+          signOut(auth); // This triggers onAuthStateChanged again.
         });
       } else {
-        // No authenticated user.
-        setUser(null);
-        setProfile(null);
-        setError(null);
+        // No authenticated user. This is a stable, valid state.
         setIsLoading(false);
       }
     }, (authError) => {
+      // An error occurred in the auth listener itself.
       console.error("Auth state error:", authError);
       setUser(null);
       setProfile(null);
@@ -82,9 +92,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [auth, firestore]);
 
   const contextValue = useMemo((): SessionContextState => {
-    // NORMALIZE ROLE: If the user has the legacy 'Merchant' role in the DB,
-    // treat them as a 'Dropshipper' for permissions and navigation to prevent loops.
     let normalizedRole = profile?.role || null;
+    // Handle legacy 'Merchant' role to prevent loops
     if (normalizedRole === 'Merchant') {
       normalizedRole = 'Dropshipper';
     }
