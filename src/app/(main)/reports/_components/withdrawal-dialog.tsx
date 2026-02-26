@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -19,8 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { useUser, useAuth } from "@/firebase";
+import { useAuth } from "@/firebase";
 import type { UserProfile } from "@/lib/types";
+import { useSession } from "@/auth/SessionProvider";
 
 
 const withdrawalSchema = z.object({
@@ -38,7 +40,7 @@ interface WithdrawalDialogProps {
 }
 
 export function WithdrawalDialog({ availableBalance, userProfile }: WithdrawalDialogProps) {
-  const { user } = useUser();
+  const { user } = useSession();
   const auth = useAuth();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);

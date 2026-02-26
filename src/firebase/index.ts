@@ -16,7 +16,6 @@ export * from './error-emitter';
 
 // Define and export granular hooks
 import { useFirebase } from './provider';
-import { useSession } from '@/auth/SessionProvider';
 import type { Auth } from 'firebase/auth';
 import type { FirebaseApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
@@ -28,12 +27,6 @@ export const useAuth = (): Auth => useFirebase().auth;
 export const useFirestore = (): Firestore => useFirebase().firestore;
 export const useStorage = (): Storage => useFirebase().storage;
 export const useFirebaseApp = (): FirebaseApp => useFirebase().firebaseApp;
-
-// This hook is also safe because its dependency `useSession` is imported from its original source.
-export const useUser = () => {
-    const { user, isLoading, error } = useSession();
-    return { user, isUserLoading: isLoading, userError: error };
-};
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 

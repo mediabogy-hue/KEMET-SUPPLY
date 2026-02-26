@@ -16,11 +16,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase, useUser } from "@/firebase";
+import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, serverTimestamp, collection, query, orderBy, writeBatch } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Briefcase, Loader2 } from "lucide-react";
+import { useSession } from "@/auth/SessionProvider";
 
 
 interface EditProductDialogProps {
@@ -31,7 +32,7 @@ interface EditProductDialogProps {
 
 export function EditProductDialog({ product, isOpen, onOpenChange }: EditProductDialogProps) {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user } = useSession();
   const { toast } = useToast();
 
   const categoriesQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "productCategories"), orderBy("name", "asc")) : null, [firestore, user]);

@@ -4,9 +4,10 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, where } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
+import { useSession } from '@/auth/SessionProvider';
 
 
 interface CategoryBrowserProps {
@@ -16,7 +17,7 @@ interface CategoryBrowserProps {
 
 export function CategoryBrowser({ selectedCategory, onSelectCategory }: CategoryBrowserProps) {
     const firestore = useFirestore();
-    const { user } = useUser();
+    const { user } = useSession();
     const categoriesQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "productCategories"), where("isAvailable", "==", true), orderBy("name", "asc")) : null, [firestore, user]);
     const { data: categories, isLoading } = useCollection<ProductCategory>(categoriesQuery);
 
