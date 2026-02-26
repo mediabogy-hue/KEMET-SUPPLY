@@ -1,9 +1,16 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { Toaster } from "@/components/ui/toaster"
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { SessionProvider } from '@/auth/SessionProvider';
 import './globals.css';
 import { PwaFeatures } from '@/components/pwa-features';
+import { cn } from '@/lib/utils';
+
+const fontSans = Inter({
+  subsets: ['latin'],
+  variable: '--font-sans',
+});
 
 export const metadata: Metadata = {
   title: 'Tashghil Dropship',
@@ -18,12 +25,14 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet" />
         <link rel="icon" href="/favicon.ico" type="image/x-icon" sizes="any" />
       </head>
-      <body className="font-body antialiased">
+      <body
+        className={cn(
+          "min-h-screen bg-background font-sans antialiased",
+          fontSans.variable
+        )}
+      >
         <FirebaseClientProvider>
           <SessionProvider>
             {children}
