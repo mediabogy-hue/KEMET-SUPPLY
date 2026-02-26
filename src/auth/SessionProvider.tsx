@@ -80,23 +80,32 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setIsLoading(true);
       if (firebaseUser) {
-        setUser(firebaseUser);
-        const { profile: loadedProfile, role: loadedRole } = await loadSessionData(firestore, firebaseUser);
-        setProfile(loadedProfile);
-        setRole(loadedRole);
-        
-        if (!loadedProfile) {
-            setError("User profile not found in database.");
-        }
-        
-        // Redirect logic after session is loaded
-        const isPublicPage = ['/', '/register', '/forgot-password'].includes(pathname) || pathname.startsWith('/product/');
-        const defaultPath = getDefaultPath(loadedRole);
-        
-        if (!isPublicPage && !hasPermission(loadedRole, pathname)) {
-            router.replace(defaultPath);
-        } else if (isPublicPage && loadedRole) {
-            router.replace(defaultPath);
+        try {
+            setUser(firebaseUser);
+            const { profile: loadedProfile, role: loadedRole } = await loadSessionData(firestore, firebaseUser);
+            setProfile(loadedProfile);
+            setRole(loadedRole);
+            
+            if (!loadedProfile) {
+                setError("User profile not found in database.");
+            }
+            
+            // Redirect logic after session is loaded
+            const isPublicPage = ['/', '/register', '/forgot-password'].includes(pathname) || pathname.startsWith('/product/');
+            const defaultPath = getDefaultPath(loadedRole);
+            
+            if (!isPublicPage && !hasPermission(loadedRole, pathname)) {
+                router.replace(defaultPath);
+            } else if (isPublicPage && loadedRole) {
+                router.replace(defaultPath);
+            }
+        } catch (e: any) {
+            console.error("Failed to load session data:", e);
+            setError("Failed to load user session. Please try again.");
+            // Gracefully clear session data on error instead of crashing
+            setUser(null);
+            setProfile(null);
+            setRole(null);
         }
 
       } else {
