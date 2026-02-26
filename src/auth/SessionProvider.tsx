@@ -1,9 +1,8 @@
-
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import type { UserProfile } from '@/lib/types';
 
@@ -26,63 +25,64 @@ const SessionContext = createContext<SessionContextState | undefined>(undefined)
 
 export function SessionProvider({ children }: { children: ReactNode }) {
   const { auth, firestore } = useFirebase();
-  const [session, setSession] = useState<{
-    user: User | null;
-    profile: UserProfile | null;
-    isLoading: boolean;
-    error: Error | null;
-  }>({
-    user: null,
-    profile: null,
-    isLoading: true,
-    error: null,
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      if (authUser) {
-        try {
-          const profileDocRef = doc(firestore, 'users', authUser.uid);
-          const docSnap = await getDoc(profileDocRef);
-          
-          if (docSnap.exists()) {
-            setSession({
-              user: authUser,
-              profile: { id: docSnap.id, ...docSnap.data() } as UserProfile,
-              isLoading: false,
-              error: null,
-            });
-          } else {
-            setSession({
-              user: authUser,
-              profile: null,
-              isLoading: false,
-              error: new Error('User profile does not exist.'),
-            });
-          }
-        } catch (e: any) {
-          setSession({
-            user: authUser,
-            profile: null,
-            isLoading: false,
-            error: e,
-          });
-        }
-      } else {
-        setSession({
-          user: null,
-          profile: null,
-          isLoading: false,
-          error: null,
-        });
+    const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
+      setUser(authUser);
+      if (!authUser) {
+          // If no user, we are done. Clear profile and stop loading.
+          setProfile(null);
+          setIsLoading(false);
       }
+    }, (authError) => {
+        // Handle listener errors
+        console.error("Auth state listener error:", authError);
+        setUser(null);
+        setProfile(null);
+        setError(authError);
+        setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [auth, firestore]);
+    return () => unsubscribeAuth();
+  }, [auth]);
+
+  useEffect(() => {
+    if (!user) {
+        // If user object is null (logged out), we don't need to fetch a profile.
+        // The isLoading state is handled by the auth-only useEffect.
+        return;
+    }
+
+    // User is authenticated, now fetch their profile.
+    // Set loading to true when we start fetching for a new user.
+    setIsLoading(true);
+    const profileDocRef = doc(firestore, 'users', user.uid);
+    
+    const unsubscribeProfile = onSnapshot(profileDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+            setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
+        } else {
+            setProfile(null);
+            setError(new Error('User profile does not exist in Firestore.'));
+        }
+        // We are done loading once we have a profile (or know it doesn't exist)
+        setIsLoading(false);
+    }, (profileError) => {
+        console.error("Profile listener error:", profileError);
+        setProfile(null);
+        setError(profileError);
+        setIsLoading(false);
+    });
+
+    return () => unsubscribeProfile();
+
+  }, [user, firestore]);
 
   const contextValue = useMemo((): SessionContextState => {
-    const { user, profile, isLoading, error } = session;
     const role = profile?.role || null;
     const isAdmin = role === 'Admin';
     return {
@@ -91,7 +91,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isLoading,
       error,
       role,
-      isAdmin: isAdmin,
+      isAdmin,
       isOrdersManager: role === 'OrdersManager' || isAdmin,
       isFinanceManager: role === 'FinanceManager' || isAdmin,
       isMerchant: role === 'Merchant',
@@ -99,7 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isDropshipper: role === 'Dropshipper',
       firestore,
     };
-  }, [session, firestore]);
+  }, [user, profile, isLoading, error, firestore]);
 
   return (
     <SessionContext.Provider value={contextValue}>
