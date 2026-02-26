@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
@@ -24,7 +25,7 @@ export interface SessionContextState {
 const SessionContext = createContext<SessionContextState | undefined>(undefined);
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const { auth, firestore } = useFirebase(); // Consume the Firebase context
+  const { auth, firestore } = useFirebase();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,7 +56,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setIsLoading(false);
         },
         (profileError) => {
-          console.error("Error fetching user profile:", profileError);
           setProfile(null);
           setError(profileError);
           setIsLoading(false);
@@ -65,7 +65,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return () => profileUnsubscribe();
     }, 
     (authError) => {
-      console.error("Auth state change error:", authError);
       setUser(null);
       setProfile(null);
       setError(authError);
@@ -77,15 +76,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const contextValue = useMemo((): SessionContextState => {
     const role = profile?.role || null;
+    const isAdmin = role === 'Admin';
     return {
       user,
       profile,
       isLoading,
       error,
       role,
-      isAdmin: role === 'Admin',
-      isOrdersManager: role === 'OrdersManager' || role === 'Admin',
-      isFinanceManager: role === 'FinanceManager' || role === 'Admin',
+      isAdmin: isAdmin,
+      isOrdersManager: role === 'OrdersManager' || isAdmin,
+      isFinanceManager: role === 'FinanceManager' || isAdmin,
       isMerchant: role === 'Merchant',
       isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(role || ''),
       isDropshipper: role === 'Dropshipper',

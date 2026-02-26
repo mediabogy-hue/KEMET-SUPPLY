@@ -17,19 +17,19 @@ service cloud.firestore {
     }
     
     function isOrdersManager() {
-        return exists(/databases/$(database)/documents/roles_orders_manager/$(request.auth.uid)) || isAdmin();
+      return exists(/databases/$(database)/documents/roles_orders_manager/$(request.auth.uid));
     }
 
     function isFinanceManager() {
-        return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid)) || isAdmin();
+      return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid));
     }
     
     function isMerchant() {
-        return exists(/databases/$(database)/documents/roles_merchant/$(request.auth.uid));
+      return exists(/databases/$(database)/documents/roles_merchant/$(request.auth.uid));
     }
 
     function isStaff() {
-        return isAdmin() || isOrdersManager() || isFinanceManager();
+      return isAdmin() || isOrdersManager() || isFinanceManager();
     }
 
     // Default-deny all reads and writes
@@ -38,6 +38,7 @@ service cloud.firestore {
     }
 
     // User profiles
+    // A user can always read their own profile. Staff can read any profile.
     match /users/{userId} {
       allow create: if isOwner(userId);
       allow get: if isOwner(userId) || isStaff();
@@ -95,7 +96,7 @@ service cloud.firestore {
     
     // Orders
     match /orders/{orderId} {
-      allow create: if (request.auth != null && request.resource.data.dropshipperId == request.auth.uid) || request.auth == null;
+      allow create: if (isSignedIn() && request.resource.data.dropshipperId == request.auth.uid) || request.auth == null;
       allow get: if isStaff() || isOwner(resource.data.dropshipperId) || (isMerchant() && resource.data.merchantId == request.auth.uid);
       allow list: if isStaff() || isMerchant();
       allow update: if isOrdersManager() || 
