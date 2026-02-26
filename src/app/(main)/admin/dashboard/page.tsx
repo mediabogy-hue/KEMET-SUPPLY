@@ -56,8 +56,6 @@ export default function AdminDashboardPage() {
         return salesByHour.reduce((sum, hour) => sum + hour.total, 0);
     }, [salesByHour]);
     
-    const hasAnyData = useMemo(() => todaysOrders && todaysOrders.length > 0, [todaysOrders]);
-
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
@@ -69,9 +67,6 @@ export default function AdminDashboardPage() {
                         نظرة عامة على أداء المنصة اليوم.
                     </p>
                 </div>
-                 {!hasAnyData && !ordersLoading && (
-                    <SeedDatabaseButton />
-                )}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -111,6 +106,18 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent>
                     <SalesByHourChart data={salesByHour} />
+                </CardContent>
+            </Card>
+
+            <Card className="border-dashed border-amber-500">
+                <CardHeader>
+                    <CardTitle>أدوات المطورين</CardTitle>
+                     <CardDescription>
+                        استخدم هذا الزر لملء قاعدة البيانات بحسابات ومنتجات وطلبات تجريبية.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <SeedDatabaseButton />
                 </CardContent>
             </Card>
         </div>
