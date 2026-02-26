@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState } from "react";
@@ -29,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, PlusCircle } from "lucide-react";
+import { Loader2, PlusCircle, Copy, Send } from "lucide-react";
 import { useSession } from "@/auth/SessionProvider";
 import { Switch } from "@/components/ui/switch";
 
@@ -47,11 +46,14 @@ export function AddUserDialog() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserProfile['role']>("Dropshipper");
   const [canTrackShift, setCanTrackShift] = useState(false);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
-  const resetForm = () => {
+  const [creationSuccessData, setCreationSuccessData] = useState<{ email: string; password: string; phone: string; name: string } | null>(null);
+
+  const resetFormAndSuccess = () => {
     setFirstName("");
     setLastName("");
     setEmail("");
@@ -59,9 +61,52 @@ export function AddUserDialog() {
     setPassword("");
     setRole("Dropshipper");
     setCanTrackShift(false);
-    setIsOpen(false);
     setEmailError(null);
+    setCreationSuccessData(null);
   }
+
+  const handleOpenChange = (open: boolean) => {
+    if (isSubmitting) return;
+    setIsOpen(open);
+    if (!open) {
+        // Use timeout to allow closing animation
+        setTimeout(() => {
+            resetFormAndSuccess();
+        }, 300);
+    }
+  }
+
+  const handleCreateAnother = () => {
+    resetFormAndSuccess();
+  }
+
+  const handleCopy = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({ title: `تم نسخ ${fieldName} بنجاح!` });
+    }).catch(err => {
+      toast({ variant: 'destructive', title: 'فشل النسخ' });
+    });
+  };
+
+  const handleSendWhatsApp = () => {
+    if (!creationSuccessData) return;
+    const { email, password, phone, name } = creationSuccessData;
+    let formattedPhone = phone.trim();
+    
+    // Normalize phone number for international format (Egypt country code: 20)
+    if (formattedPhone.startsWith('0')) {
+        formattedPhone = '2' + formattedPhone;
+    } else if (!formattedPhone.startsWith('20')) {
+        formattedPhone = '20' + formattedPhone;
+    }
+    
+    const platformUrl = `${window.location.origin}/login`;
+    const finalMessage = `مرحباً ${name}،\n\nتم إنشاء حسابك على منصة Kemet Supply بنجاح.\n\nيمكنك تسجيل الدخول باستخدام البيانات التالية:\n*البريد الإلكتروني:* ${email}\n*كلمة المرور:* ${password}\n\n*رابط تسجيل الدخول:*\n${platformUrl}`;
+
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(finalMessage)}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
 
   const handleSaveUser = async () => {
     setEmailError(null);
@@ -123,7 +168,7 @@ export function AddUserDialog() {
 
       await batch.commit();
       
-      resetForm();
+      setCreationSuccessData({ email, password, phone, name: `${firstName} ${lastName}`});
 
     } catch (error: any) {
       console.error("Error creating user:", error);
@@ -148,10 +193,7 @@ export function AddUserDialog() {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-        if(!isSubmitting && !open) resetForm();
-        setIsOpen(open)
-    }}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button>
           <PlusCircle />
@@ -159,108 +201,156 @@ export function AddUserDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>إضافة مستخدم جديد</DialogTitle>
-          <DialogDescription>
-            أدخل بيانات المستخدم الجديد. سيتم إنشاء حساب له بكلمة المرور
-            المدخلة.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="first-name">الاسم الأول</Label>
-              <Input
-                id="first-name"
-                placeholder="علي"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="last-name">الاسم الأخير</Label>
-              <Input
-                id="last-name"
-                placeholder="حسن"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">البريد</Label>
-             <Input
-              id="email"
-              type="email"
-              placeholder="user@kemetsupply.com"
-              value={email}
-              onChange={(e) => {
-                  setEmail(e.target.value)
-                  setEmailError(null)
-              }}
-              className={cn(emailError && "border-destructive")}
-              />
-              {emailError && <p className="mt-1 text-sm text-destructive">{emailError}</p>}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">رقم الهاتف</Label>
-            <Input
-                id="phone"
-                type="tel"
-                placeholder="01xxxxxxxxx"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-            />
-          </div>
-           <div className="space-y-2">
-            <Label htmlFor="role">الدور</Label>
-            <Select value={role} onValueChange={(value) => setRole(value as UserProfile['role'])}>
-                <SelectTrigger>
-                    <SelectValue placeholder="اختر دور المستخدم" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="Dropshipper">مسوق</SelectItem>
-                    {isAdmin && <SelectItem value="Admin">أدمن</SelectItem>}
-                    <SelectItem value="OrdersManager">مدير طلبات</SelectItem>
-                    <SelectItem value="FinanceManager">مدير مالي</SelectItem>
-                    <SelectItem value="Merchant">تاجر</SelectItem>
-                </SelectContent>
-            </Select>
-          </div>
-          {role === 'Dropshipper' && (
-            <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                    <Label htmlFor="can-track-shift">تفعيل نظام الورديات</Label>
-                    <p className="text-xs text-muted-foreground">
-                        السماح لهذا المسوق بتسجيل ساعات العمل.
-                    </p>
+        {creationSuccessData ? (
+            <>
+                <DialogHeader>
+                    <DialogTitle className="text-2xl text-green-600">🎉 تم إنشاء الحساب بنجاح</DialogTitle>
+                    <DialogDescription>
+                        الرجاء نسخ بيانات الدخول وإرسالها إلى {creationSuccessData.name}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="success-email">البريد الإلكتروني</Label>
+                        <div className="flex items-center gap-2">
+                            <Input id="success-email" value={creationSuccessData.email} readOnly />
+                            <Button variant="outline" size="icon" onClick={() => handleCopy(creationSuccessData.email, 'البريد الإلكتروني')}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="success-password">كلمة المرور</Label>
+                        <div className="flex items-center gap-2">
+                            <Input id="success-password" value={creationSuccessData.password} readOnly />
+                             <Button variant="outline" size="icon" onClick={() => handleCopy(creationSuccessData.password, 'كلمة المرور')}>
+                                <Copy className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </div>
                 </div>
-                <Switch
-                    id="can-track-shift"
-                    checked={canTrackShift}
-                    onCheckedChange={setCanTrackShift}
-                />
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="password">كلمة المرور</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </div>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isSubmitting}>إلغاء</Button>
-          </DialogClose>
-          <Button type="button" onClick={handleSaveUser} disabled={isSubmitting}>
-            {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-            {isSubmitting ? 'جاري الحفظ...' : 'حفظ'}
-          </Button>
-        </DialogFooter>
+                <DialogFooter className="gap-2 sm:justify-between">
+                    <Button variant="secondary" onClick={handleCreateAnother}>
+                        إنشاء حساب آخر
+                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleSendWhatsApp}>
+                            <Send className="me-2" /> إرسال عبر واتساب
+                        </Button>
+                         <Button variant="outline" onClick={() => handleOpenChange(false)}>إغلاق</Button>
+                    </div>
+                </DialogFooter>
+            </>
+        ) : (
+            <>
+                <DialogHeader>
+                  <DialogTitle>إضافة مستخدم جديد</DialogTitle>
+                  <DialogDescription>
+                    أدخل بيانات المستخدم الجديد. سيتم إنشاء حساب له بكلمة المرور
+                    المدخلة.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first-name">الاسم الأول</Label>
+                      <Input
+                        id="first-name"
+                        placeholder="علي"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last-name">الاسم الأخير</Label>
+                      <Input
+                        id="last-name"
+                        placeholder="حسن"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">البريد</Label>
+                     <Input
+                      id="email"
+                      type="email"
+                      placeholder="user@kemetsupply.com"
+                      value={email}
+                      onChange={(e) => {
+                          setEmail(e.target.value)
+                          setEmailError(null)
+                      }}
+                      className={cn(emailError && "border-destructive")}
+                      disabled={isSubmitting}
+                      />
+                      {emailError && <p className="mt-1 text-sm text-destructive">{emailError}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">رقم الهاتف</Label>
+                    <Input
+                        id="phone"
+                        type="tel"
+                        placeholder="01xxxxxxxxx"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        disabled={isSubmitting}
+                    />
+                  </div>
+                   <div className="space-y-2">
+                    <Label htmlFor="role">الدور</Label>
+                    <Select value={role} onValueChange={(value) => setRole(value as UserProfile['role'])} disabled={isSubmitting}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="اختر دور المستخدم" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Dropshipper">مسوق</SelectItem>
+                            {isAdmin && <SelectItem value="Admin">أدمن</SelectItem>}
+                            <SelectItem value="OrdersManager">مدير طلبات</SelectItem>
+                            <SelectItem value="FinanceManager">مدير مالي</SelectItem>
+                            <SelectItem value="Merchant">تاجر</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  {role === 'Dropshipper' && (
+                    <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                        <div className="space-y-0.5">
+                            <Label htmlFor="can-track-shift">تفعيل نظام الورديات</Label>
+                            <p className="text-xs text-muted-foreground">
+                                السماح لهذا المسوق بتسجيل ساعات العمل.
+                            </p>
+                        </div>
+                        <Switch
+                            id="can-track-shift"
+                            checked={canTrackShift}
+                            onCheckedChange={setCanTrackShift}
+                            disabled={isSubmitting}
+                        />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="password">كلمة المرور</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>إلغاء</Button>
+                  <Button type="button" onClick={handleSaveUser} disabled={isSubmitting}>
+                    {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                    {isSubmitting ? 'جاري الحفظ...' : 'حفظ'}
+                  </Button>
+                </DialogFooter>
+            </>
+        )}
       </DialogContent>
     </Dialog>
   );
