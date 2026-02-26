@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import type { Order, Shipment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,7 +86,7 @@ export default function AdminOrdersPage() {
         setOrderToViewShipment(order);
         try {
             const shipmentRef = doc(firestore, 'shipments', order.shipmentId);
-            const docSnap = await (await import('firebase/firestore')).getDoc(shipmentRef);
+            const docSnap = await getDoc(shipmentRef);
             if (docSnap.exists()) {
                 setShipmentDetails(docSnap.data() as Shipment);
             } else {

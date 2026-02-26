@@ -13,6 +13,24 @@ const nextConfig = {
         hostname: "picsum.photos",
         port: "",
         pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "files.easy-orders.net",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+        port: "",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "avatar.vercel.sh",
+        port: "",
+        pathname: "/**",
       }
     ],
   },
