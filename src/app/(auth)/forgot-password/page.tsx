@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from "next/link";
@@ -22,14 +23,6 @@ export default function ForgotPasswordPage() {
   
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth) {
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "خدمة المصادقة غير متاحة.",
-      });
-      return;
-    }
     if (!email) {
       toast({
         variant: "destructive",
@@ -124,3 +117,4 @@ export default function ForgotPasswordPage() {
     </div>
   );
 }
+    

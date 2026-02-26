@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -43,10 +44,6 @@ export default function RegisterPage() {
   }, [isSessionLoading, user, role, router]);
 
   const handleRegister = async () => {
-    if (!auth || !firestore) {
-      toast({ variant: 'destructive', title: 'خطأ', description: 'خدمات Firebase غير متاحة.' });
-      return;
-    }
     if (password !== confirmPassword) {
       toast({ variant: 'destructive', title: 'خطأ', description: 'كلمتا المرور غير متطابقتين.' });
       return;
@@ -275,3 +272,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+    

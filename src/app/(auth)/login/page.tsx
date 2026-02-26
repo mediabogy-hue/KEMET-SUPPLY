@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -24,10 +25,6 @@ export default function LoginPage() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!auth) {
-        toast({ variant: 'destructive', title: 'خطأ', description: 'خدمة المصادقة غير متاحة.' });
-        return;
-    };
     setIsLoading(true);
     setError(null);
     try {
@@ -129,3 +126,4 @@ export default function LoginPage() {
     </div>
   );
 }
+    

@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useFirebase, errorEmitter, FirestorePermissionError, useAuth } from "@/firebase";
+import { useFirebase, errorEmitter, FirestorePermissionError, useAuth, useFirestore } from "@/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, writeBatch } from "firebase/firestore";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,7 @@ import { Switch } from "@/components/ui/switch";
 
 
 export function AddUserDialog() {
-  const { firestore } = useFirebase();
+  const firestore = useFirestore();
   const auth = useAuth();
   const { toast } = useToast();
   const { isAdmin } = useSession();
@@ -117,11 +117,6 @@ export function AddUserDialog() {
         description: "الرجاء ملء جميع الحقول.",
       });
       return;
-    }
-
-    if (!auth || !firestore) {
-        toast({ variant: "destructive", title: "خطأ", description: "خدمات Firebase غير متاحة." });
-        return;
     }
 
     setIsSubmitting(true);
@@ -355,3 +350,4 @@ export function AddUserDialog() {
     </Dialog>
   );
 }
+    

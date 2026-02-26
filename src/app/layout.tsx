@@ -2,7 +2,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { Toaster } from "@/components/ui/toaster"
-import { FirebaseClientProvider } from '@/firebase/client-provider';
 import { SessionProvider } from '@/auth/SessionProvider';
 import './globals.css';
 import { cn } from '@/lib/utils';
@@ -34,15 +33,14 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <FirebaseClientProvider>
-          <SessionProvider>
-            <SidebarProvider>
-              {children}
-            </SidebarProvider>
-            <Toaster />
-          </SessionProvider>
-        </FirebaseClientProvider>
+        <SessionProvider>
+          <SidebarProvider>
+            {children}
+          </SidebarProvider>
+          <Toaster />
+        </SessionProvider>
       </body>
     </html>
   );
 }
+    

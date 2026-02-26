@@ -1,19 +1,5 @@
 
-'use client';
-
-import { FirebaseProvider } from '@/firebase/provider';
-import { app, auth, db, storage } from '@/lib/firebaseClient';
-import React from 'react';
-
-export function FirebaseClientProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <FirebaseProvider
-        firebaseApp={app}
-        auth={auth}
-        firestore={db}
-        storage={storage}
-    >
-      {children}
-    </FirebaseProvider>
-  );
-}
+// This file is obsolete and its functionality has been merged into /src/auth/SessionProvider.tsx
+// It is intentionally left blank to prevent build errors during the transition.
+// It can be safely deleted in a future cleanup.
+    
