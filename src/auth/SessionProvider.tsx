@@ -28,24 +28,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { auth, firestore } = useFirebase();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Start loading and only set to false when a final state is reached.
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: Unsubscribe | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
-      // If a profile listener is active from a previous user, unsubscribe from it.
       if (unsubscribeProfile) {
         unsubscribeProfile();
         unsubscribeProfile = undefined;
       }
       
-      // Every time auth state changes, reset to loading.
-      setIsLoading(true);
-      setUser(null);
-      setProfile(null);
-      setError(null);
+      // Do NOT set loading back to true here. This was the source of the infinite loop.
+      // We only transition from true -> false once.
 
       if (authUser) {
         // User is authenticated, now try to fetch their profile.
@@ -56,23 +52,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             setUser(authUser);
             setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             setError(null);
-            setIsLoading(false); // We have a stable, valid session.
+            setIsLoading(false); // FINAL STATE: Logged in.
           } else {
             // CRITICAL ERROR: Auth user exists but no profile document.
             // This account is in a broken state. Log the user out to prevent infinite loops/broken UI.
             console.error(`User with UID ${authUser.uid} is authenticated but has no profile document. Forcing sign out.`);
-            signOut(auth); // This triggers onAuthStateChanged again, leading to the "logged out" state.
+            signOut(auth); // This triggers onAuthStateChanged again, isLoading remains true until the 'else' block is hit.
           }
         }, (profileError) => {
           // CRITICAL ERROR: Failed to read profile document (e.g., permission denied).
-          // Log the user out.
           console.error("Profile snapshot error, forcing sign out:", profileError);
           setError(profileError);
           signOut(auth); // This triggers onAuthStateChanged again.
         });
       } else {
         // No authenticated user. This is a stable, valid state.
-        setIsLoading(false);
+        setUser(null);
+        setProfile(null);
+        setError(null);
+        setIsLoading(false); // FINAL STATE: Logged out.
       }
     }, (authError) => {
       // An error occurred in the auth listener itself.
@@ -80,7 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setProfile(null);
       setError(authError);
-      setIsLoading(false);
+      setIsLoading(false); // FINAL STATE: Error.
     });
 
     return () => {
