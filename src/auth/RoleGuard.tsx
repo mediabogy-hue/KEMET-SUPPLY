@@ -42,21 +42,11 @@ export function RoleGuard({ children }: { children: React.ReactNode }) {
   if (!hasPermission(role, pathname)) {
     // This is a fallback screen, shown briefly before redirect.
     return (
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-            <Card>
-                <CardHeader>
-                    <CardTitle>غير مصرح بالدخول</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <ShieldAlert className="h-4 w-4" />
-                        <AlertTitle>ليس لديك الصلاحية!</AlertTitle>
-                        <AlertDescription>
-                          يتم الآن توجيهك إلى صفحتك الرئيسية.
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
+        <div className="flex h-screen w-full items-center justify-center bg-background">
+             <div className="flex items-center gap-2 text-muted-foreground">
+                <Rocket className="h-5 w-5 animate-pulse text-primary" />
+                <span>جاري التحميل...</span>
+            </div>
         </div>
     );
   }
