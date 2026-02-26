@@ -98,7 +98,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow create: if (isSignedIn() && request.resource.data.dropshipperId == request.auth.uid) || request.auth == null;
       allow get: if isStaff() || isOwner(resource.data.dropshipperId) || (isMerchant() && resource.data.merchantId == request.auth.uid);
-      allow list: if isStaff() || isMerchant();
+      allow list: if isSignedIn();
       allow update: if isOrdersManager() || 
                     (isMerchant() && 
                      resource.data.merchantId == request.auth.uid &&
