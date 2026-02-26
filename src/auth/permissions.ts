@@ -22,8 +22,7 @@ export function hasPermission(role: UserRole | null, path: string): boolean {
     return true;
   }
   
-  // Admin has access to all admin routes implicitly.
-  // Admins can also access the merchant portal for supervision.
+  // Admins can access their own routes and supervise merchant routes.
   if (role === 'Admin' && (path.startsWith('/admin') || path.startsWith('/merchant'))) {
     return true;
   }
@@ -40,5 +39,5 @@ export function getDefaultPath(role: UserRole | null): string {
   if (role === 'Dropshipper') return '/dashboard';
   
   // Default fallback for unhandled or null roles
-  return '/';
+  return '/login';
 }

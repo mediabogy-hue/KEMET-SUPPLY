@@ -34,20 +34,64 @@ const loadSessionData = async (firestore: any, user: User): Promise<{ profile: U
     const userDocRef = doc(firestore, 'users', user.uid);
     const userDocSnap = await getDoc(userDocRef);
 
+    let profile: UserProfile | null = null;
+    let role: UserProfile['role'] | null = null;
+
     if (userDocSnap.exists()) {
-        const profile = userDocSnap.data() as UserProfile;
-        // The role from the user document is the source of truth
-        return { profile, role: profile.role };
-    }
-    // Fallback for older accounts that might not have the role field
-    const adminRoleRef = doc(firestore, 'roles_admin', user.uid);
-    const adminRoleSnap = await getDoc(adminRoleRef);
-    if (adminRoleSnap.exists()) {
-        const profile = { email: user.email, role: 'Admin' } as UserProfile;
-        return { profile, role: 'Admin' };
+        const data = userDocSnap.data() as UserProfile;
+        profile = data;
+        // Trust the role in the user document if it exists.
+        if (data.role) {
+            role = data.role;
+        }
     }
 
-    return { profile: null, role: null };
+    // If the user's role is still not 'Admin' (or not determined),
+    // check the dedicated role collections as a potential override or fallback.
+    // This makes the system resilient to incorrect `role` fields in the user doc.
+    const roleChecks: Array<{ roleName: UserProfile['role'], path: string }> = [
+        { roleName: 'Admin', path: `roles_admin/${user.uid}` },
+        { roleName: 'Merchant', path: `roles_merchant/${user.uid}` },
+        { roleName: 'OrdersManager', path: `roles_orders_manager/${user.uid}` },
+        { roleName: 'FinanceManager', path: `roles_finance_manager/${user.uid}` },
+    ];
+
+    for (const check of roleChecks) {
+        try {
+            const roleDocSnap = await getDoc(doc(firestore, check.path));
+            if (roleDocSnap.exists()) {
+                // If a specific role doc exists, it takes precedence.
+                role = check.roleName;
+                break;
+            }
+        } catch (e) {
+            console.warn(`Could not check role at path: ${check.path}`);
+        }
+    }
+    
+    // If after all checks there is still no role, and a profile was loaded,
+    // it implies a dropshipper account (as they don't have a separate role doc).
+    if (!role && profile) {
+        role = 'Dropshipper';
+    }
+
+    // If profile was not loaded but a role was found via role collections, create a minimal profile.
+    if (!profile && role) {
+         profile = { 
+            id: user.uid,
+            email: user.email!, 
+            firstName: user.displayName?.split(' ')[0] || '',
+            lastName: user.displayName?.split(' ')[1] || '',
+            role: role 
+        } as UserProfile;
+    }
+    
+    // Final check: if we have a profile, make sure its role matches the determined role.
+    if (profile && role) {
+        profile.role = role;
+    }
+
+    return { profile, role };
 };
 
 
@@ -108,20 +152,23 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [auth, firestore]);
   
-  const contextValue = useMemo(() => ({
-    user,
-    profile,
-    role,
-    isLoading,
-    error,
-    isAdmin: role === 'Admin',
-    isOrdersManager: role === 'OrdersManager' || role === 'Admin',
-    isFinanceManager: role === 'FinanceManager' || role === 'Admin',
-    isMerchant: role === 'Merchant' || role === 'Admin',
-    isStaff: ['Admin', 'OrdersManager', 'FinanceManager', 'Merchant'].includes(role || ''),
-    isDropshipper: role === 'Dropshipper',
-    refreshSession,
-  }), [user, profile, role, isLoading, error, refreshSession]);
+  const contextValue = useMemo(() => {
+      const currentRole = role;
+      return {
+        user,
+        profile,
+        role: currentRole,
+        isLoading,
+        error,
+        isAdmin: currentRole === 'Admin',
+        isOrdersManager: currentRole === 'OrdersManager' || currentRole === 'Admin',
+        isFinanceManager: currentRole === 'FinanceManager' || currentRole === 'Admin',
+        isMerchant: currentRole === 'Merchant',
+        isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(currentRole || ''),
+        isDropshipper: currentRole === 'Dropshipper',
+        refreshSession,
+      }
+  }, [user, profile, role, isLoading, error, refreshSession]);
 
 
   return (
