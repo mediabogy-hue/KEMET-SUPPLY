@@ -1,16 +1,17 @@
+
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, updateDoc, serverTimestamp, Firestore } from 'firebase/firestore';
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import { doc, onSnapshot, Unsubscribe, DocumentData, FirestoreError, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { UserProfile } from '@/lib/types';
+import type { UserProfile } from '@/lib/types';
+import { User } from 'firebase/auth';
 
 type SessionContextType = {
   user: User | null;
   profile: UserProfile | null;
   role: UserProfile['role'] | null;
-  isLoading: boolean;
+  isLoading: boolean; // A single, reliable loading state
   error: string | null;
   isAdmin: boolean;
   isOrdersManager: boolean;
@@ -23,110 +24,84 @@ type SessionContextType = {
 
 const SessionContext = createContext<SessionContextType | null>(null);
 
-/**
- * Loads the user profile from Firestore. This function is designed to be simple and robust.
- * It performs a single document read and avoids complex, multi-read verification logic
- * on the client-side. The role stored in the user document is trusted as the source of truth for the client.
- * @param firestore - The Firestore instance.
- * @param user - The authenticated Firebase user.
- * @returns An object containing the user's profile and role, or nulls if not found or on error.
- */
-const loadSessionData = async (firestore: Firestore, user: User): Promise<{ profile: UserProfile | null; role: UserProfile['role'] | null }> => {
-  const userDocRef = doc(firestore, 'users', user.uid);
-  try {
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-      const profile = userDocSnap.data() as UserProfile;
-      // The role in the user document is the source of truth for the client.
-      const role = profile.role || 'Dropshipper'; // Default to Dropshipper if role is missing.
-      
-      // Self-healing: If the role field is missing, update it in Firestore.
-      if (!profile.role) {
-        console.warn(`User ${user.uid} is missing a role. Defaulting to Dropshipper and updating profile.`);
-        updateDoc(userDocRef, { role: 'Dropshipper', updatedAt: serverTimestamp() }).catch(console.error);
-        profile.role = 'Dropshipper'; // Update in-memory profile for the current session.
-      }
-      
-      return { profile, role };
-    } else {
-      // This case can happen if a user exists in Auth but their Firestore document was deleted
-      // or failed to be created during registration.
-      console.warn(`User profile not found in Firestore for UID: ${user.uid}.`);
-      return { profile: null, role: null };
-    }
-  } catch (error) {
-    console.error("Error fetching user profile:", error);
-    // This could be a permissions error. We must handle it gracefully by returning nulls.
-    return { profile: null, role: null };
-  }
-};
-
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const { auth, firestore } = useFirebase();
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [role, setRole] = useState<UserProfile['role'] | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // 1. Get auth state from the primary Firebase provider
+  const { user, isUserLoading, auth, firestore } = useFirebase();
 
-  const refreshSession = useCallback(async () => {
-    if (auth?.currentUser && firestore) {
-      setIsLoading(true);
-      const { profile: refreshedProfile, role: refreshedRole } = await loadSessionData(firestore, auth.currentUser);
-      setProfile(refreshedProfile);
-      setRole(refreshedRole);
-      setIsLoading(false);
-    }
-  }, [auth, firestore]);
+  // 2. Manage profile fetching state separately
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   
+  // 3. Effect to subscribe to the user's profile document in Firestore
   useEffect(() => {
-    if (!auth || !firestore) {
-      setIsLoading(false);
+    // If auth is still loading, or there's no user, we don't need to do anything.
+    if (isUserLoading || !user || !firestore) {
+      setProfile(null);
+      // We are not "profile loading" if there's no user to load a profile for.
+      setIsProfileLoading(false); 
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setIsLoading(true);
-      setError(null);
+    setIsProfileLoading(true);
+    const userDocRef = doc(firestore, 'users', user.uid);
 
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const { profile, role } = await loadSessionData(firestore, firebaseUser);
-        setProfile(profile);
-        setRole(role);
-        if (!profile) {
-            setError("User profile could not be loaded from the database.");
+    const unsubscribe = onSnapshot(userDocRef, 
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const userProfile = docSnap.data() as UserProfile;
+          // Self-healing: Ensure role exists. If not, default to Dropshipper and update the document.
+          if (!userProfile.role) {
+            userProfile.role = 'Dropshipper';
+            console.warn(`User ${user.uid} is missing a role. Defaulting to Dropshipper and updating profile.`);
+            updateDoc(userDocRef, { role: 'Dropshipper', updatedAt: serverTimestamp() }).catch(console.error);
+          }
+          setProfile(userProfile);
+        } else {
+          setProfile(null);
+          setProfileError("User profile document not found in Firestore.");
+          console.warn(`User profile not found for UID: ${user.uid}`);
         }
-      } else {
-        setUser(null);
+        setIsProfileLoading(false);
+      }, 
+      (error: FirestoreError) => {
+        console.error("Error fetching user profile:", error);
         setProfile(null);
-        setRole(null);
+        setProfileError(error.message);
+        setIsProfileLoading(false);
       }
-      setIsLoading(false);
-    });
+    );
 
+    // Cleanup subscription on user change or unmount
     return () => unsubscribe();
-  }, [auth, firestore]);
-  
-  const contextValue = useMemo(() => {
-      const currentRole = role;
-      return {
-        user,
-        profile,
-        role: currentRole,
-        isLoading,
-        error,
-        isAdmin: currentRole === 'Admin',
-        isOrdersManager: currentRole === 'OrdersManager' || currentRole === 'Admin',
-        isFinanceManager: currentRole === 'FinanceManager' || currentRole === 'Admin',
-        isMerchant: currentRole === 'Merchant',
-        isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(currentRole || ''),
-        isDropshipper: currentRole === 'Dropshipper',
-        refreshSession,
-      }
-  }, [user, profile, role, isLoading, error, refreshSession]);
+  }, [user, isUserLoading, firestore]);
 
+  const refreshSession = useCallback(() => {
+      // This is now tricky. A real-time listener is already in place.
+      // A hard refresh might not be necessary unless we want to force re-fetch from server.
+      // For now, let's make it a no-op, as the onSnapshot should keep things in sync.
+      console.log("Session refresh requested. Real-time listener is active.");
+  }, []);
+
+  const role = profile?.role || null;
+
+  const contextValue = useMemo(() => {
+    const finalIsLoading = isUserLoading || isProfileLoading;
+    return {
+      user,
+      profile,
+      role,
+      isLoading: finalIsLoading,
+      error: profileError,
+      isAdmin: role === 'Admin',
+      isOrdersManager: role === 'OrdersManager' || role === 'Admin',
+      isFinanceManager: role === 'FinanceManager' || role === 'Admin',
+      isMerchant: role === 'Merchant',
+      isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(role || ''),
+      isDropshipper: role === 'Dropshipper',
+      refreshSession,
+    };
+  }, [user, profile, role, isUserLoading, isProfileLoading, profileError, refreshSession]);
 
   return (
     <SessionContext.Provider value={contextValue}>
@@ -135,7 +110,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useSession = () => {
+export const useSession = (): SessionContextType => {
   const context = useContext(SessionContext);
   if (!context) {
     throw new Error('useSession must be used within a SessionProvider');
