@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -13,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { doc, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import type { UserProfile } from '@/lib/types';
 import { MerchantInquiryDialog } from './_components/merchant-inquiry-dialog';
+import Image from 'next/image';
 
 export default function RegisterPage() {
   const auth = useAuth();
@@ -112,119 +114,139 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4 py-12">
-      <Card className="w-full max-w-lg">
-        <CardHeader className="text-center space-y-4">
-          <Link href="/" className="mx-auto">
-             <Logo />
-          </Link>
-          <CardTitle className="text-2xl">إنشاء حساب مسوق جديد</CardTitle>
-          <CardDescription>
-            خطوتك الأولى نحو النجاح في التجارة الإلكترونية تبدأ من هنا.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="first-name">الاسم الأول</Label>
-                <Input
-                  id="first-name"
-                  placeholder="علي"
-                  required
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="last-name">الاسم الأخير</Label>
-                <Input
-                  id="last-name"
-                  placeholder="محمد"
-                  required
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  disabled={isSubmitting}
-                />
-              </div>
+    <div className="w-full lg:grid lg:min-h-screen lg:grid-cols-2">
+       <div className="flex items-center justify-center p-6 sm:p-12">
+        <div className="mx-auto grid w-full max-w-lg gap-8">
+            <Card>
+              <CardHeader className="text-center space-y-4">
+                <Link href="/" className="mx-auto">
+                  <Logo />
+                </Link>
+                <CardTitle className="text-2xl">إنشاء حساب مسوق جديد</CardTitle>
+                <CardDescription>
+                  خطوتك الأولى نحو النجاح في التجارة الإلكترونية تبدأ من هنا.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="first-name">الاسم الأول</Label>
+                      <Input
+                        id="first-name"
+                        placeholder="علي"
+                        required
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="last-name">الاسم الأخير</Label>
+                      <Input
+                        id="last-name"
+                        placeholder="محمد"
+                        required
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">البريد الإلكتروني</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="m@example.com"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">رقم الهاتف</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="01xxxxxxxxx"
+                      required
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">كلمة المرور</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password">تأكيد كلمة المرور</Label>
+                    <Input
+                      id="confirm-password"
+                      type="password"
+                      required
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleRegister}
+                    type="submit"
+                    className="w-full"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
+                  </Button>
+                </div>
+                <div className="mt-4 text-center text-sm">
+                  لديك حساب بالفعل؟{' '}
+                  <Link href="/" className="underline">
+                    تسجيل الدخول
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">هل أنت تاجر أو مورد؟</CardTitle>
+                <CardDescription>
+                  هل تملك منتجات وترغب في عرضها على منصتنا ليصل إليها آلاف المسوقين؟ تواصل معنا.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                  <MerchantInquiryDialog />
+              </CardContent>
+            </Card>
+        </div>
+      </div>
+       <div className="hidden bg-muted lg:block relative">
+        <Image
+          src="https://picsum.photos/seed/authbg/1280/800"
+          alt="Kemet Supply Platform"
+          data-ai-hint="abstract tech"
+          fill
+          className="object-cover"
+        />
+         <div className="relative z-10 flex items-center justify-center h-full bg-black/50">
+            <div className="text-center text-white p-8 rounded-lg max-w-md">
+                <h2 className="text-4xl font-bold">بوابتك للنجاح في التجارة الإلكترونية</h2>
+                <p className="mt-4 text-lg">
+                   منصة واحدة لإدارة تجارتك. انضم إلى آلاف المسوقين بالعمولة والتجار الذين يحققون النجاح معنا. سهولة، سرعة، وأرباح مضمونة.
+                </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="m@example.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">رقم الهاتف</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="01xxxxxxxxx"
-                required
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">كلمة المرور</Label>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirm-password">تأكيد كلمة المرور</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <Button
-              onClick={handleRegister}
-              type="submit"
-              className="w-full"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'جاري الإنشاء...' : 'إنشاء الحساب'}
-            </Button>
-          </div>
-          <div className="mt-4 text-center text-sm">
-            لديك حساب بالفعل؟{' '}
-            <Link href="/" className="underline">
-              تسجيل الدخول
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card className="w-full max-w-lg mt-8">
-        <CardHeader>
-           <CardTitle className="text-xl">هل أنت تاجر أو مورد؟</CardTitle>
-           <CardDescription>
-             هل تملك منتجات وترغب في عرضها على منصتنا ليصل إليها آلاف المسوقين؟ تواصل معنا.
-           </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center">
-            <MerchantInquiryDialog />
-        </CardContent>
-      </Card>
-
+        </div>
+      </div>
     </div>
   );
 }
