@@ -218,6 +218,19 @@ export interface ReferredCustomer {
   lastInteractionAt: Timestamp;
 }
 
+export interface MerchantInquiry {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  message: string;
+  status: 'New' | 'Contacted' | 'Approved' | 'Rejected';
+  createdAt: Timestamp;
+  updatedAt?: Timestamp;
+  adminNotes?: string;
+}
+
 export interface MarketingCampaign {
   id: string;
   name: string;
