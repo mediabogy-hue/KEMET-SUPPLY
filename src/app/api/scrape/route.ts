@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
-// Dynamically import genkit and its plugins to ensure they are only loaded on the server when needed.
+// This function contains the entire Genkit logic and is only called on the server.
+// It dynamically imports Genkit to prevent Next.js from bundling it on the client.
 async function runScrapeFlow(htmlContent: string, categoryNames: string[], productUrl: string) {
     const { genkit } = await import('@genkit-ai/core');
     const { googleAI } = await import('@genkit-ai/google-genai');
     
+    // Initialize Genkit within the server-side execution context.
     const ai = genkit({
         plugins: [googleAI()],
     });
 
+    // Define the precise schemas for input and output.
     const ScrapedProductDataSchema = z.object({
       name: z.string().describe('The name of the product.'),
       description: z.string().describe('The detailed description of the product.'),
@@ -24,8 +27,9 @@ async function runScrapeFlow(htmlContent: string, categoryNames: string[], produ
       productUrl: z.string().describe("The URL of the product page for resolving relative image paths."),
     });
     
+    // Define the prompt with clear instructions for the AI model.
     const scrapePrompt = ai.definePrompt({
-        name: 'scrapeProductPrompt_v6',
+        name: 'scrapeProductPrompt_v5', // Versioning the prompt
         input: { schema: ScrapeProductInputSchema },
         output: { schema: ScrapedProductDataSchema },
         prompt: `You are an expert web scraper for e-commerce sites like Amazon, Noon, and Jumia. Your task is to extract product information from the provided HTML content and classify it.
@@ -46,24 +50,26 @@ async function runScrapeFlow(htmlContent: string, categoryNames: string[], produ
 
           IMPORTANT: Return the result as a valid JSON object. If you cannot find a piece of information, you MUST return an empty string for string fields, 0 for the price, and an empty array for image URLs. For category, if you cannot determine a suitable one, you must still choose the most likely category from the provided list. Do not omit any fields. Your response MUST be a single JSON object and nothing else.`,
         config: {
-            temperature: 0.0,
+            temperature: 0.1, // Lower temperature for more predictable, structured output
         },
-        model: 'gemini-1.5-flash-latest'
+        model: 'gemini-1.5-flash-latest' // Using a modern, fast model
     });
 
+    // Execute the prompt.
     const { output } = await scrapePrompt({ htmlContent, categoryNames, productUrl });
 
     if (!output) {
       throw new Error('AI response failed to parse product data.');
     }
 
+    // Validate the output against the schema before returning.
     return ScrapedProductDataSchema.parse(output);
 }
 
-
+// Ensure this route runs on the Node.js runtime.
 export const runtime = "nodejs";
 
-// The main POST handler
+// The main POST handler for the API route.
 export async function POST(req: Request) {
     try {
         const body = await req.json();
@@ -73,15 +79,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Missing or invalid productUrl or categoryNames' }, { status: 400 });
         }
 
-        // Fetch HTML content from the URL
+        // Fetch HTML content with a realistic User-Agent and a timeout.
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 25000); // 25-second timeout
 
         const response = await fetch(productUrl, {
             signal: controller.signal,
-            headers: { // Use a realistic User-Agent
+            headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
                 'Accept-Language': 'en-US,en;q=0.9,ar;q=0.8',
             },
         });
@@ -92,7 +97,7 @@ export async function POST(req: Request) {
         }
         const htmlContent = await response.text();
 
-        // Clean and simplify HTML before sending to AI to save tokens and improve accuracy
+        // Clean the HTML to improve AI performance and accuracy.
         const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
         const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
 
@@ -106,23 +111,28 @@ export async function POST(req: Request) {
             .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
             .replace(/<!--[\s\S]*?-->/g, ' ');
 
-        const simplifiedHtml = cleanedHtml.replace(/\s\s+/g, ' ').substring(0, 150000); // Limit size for performance
+        // Limit size to prevent overly large requests to the AI model.
+        const simplifiedHtml = cleanedHtml.replace(/\s\s+/g, ' ').substring(0, 150000); 
         
-        // Run the isolated Genkit flow
+        // Run the isolated Genkit flow.
         const validatedOutput = await runScrapeFlow(simplifiedHtml, categoryNames, productUrl);
 
         return NextResponse.json({ data: validatedOutput });
 
     } catch (error: any) {
         console.error('[API SCRAPE - POST HANDLER ERROR]', error);
+        
         let arabicErrorMessage = "فشل جلب البيانات. قد يقوم الخادم بحظر الطلبات أو أن الصفحة غير صالحة.";
         if (error.name === 'AbortError') {
             arabicErrorMessage = 'لم نتمكن من جلب البيانات من الرابط: انتهت مهلة الطلب.';
         } else if (error instanceof z.ZodError) {
              arabicErrorMessage = `فشل التحقق من صحة البيانات المستلمة من الذكاء الاصطناعي: ${error.errors.map(e => e.message).join(', ')}`;
+        } else if (error.message.includes('Status: 403')) {
+            arabicErrorMessage = "فشل جلب البيانات: الموقع المستهدف يرفض الوصول (خطأ 403).";
         } else if (error.message) {
             arabicErrorMessage = error.message;
         }
+
         return NextResponse.json({ error: arabicErrorMessage }, { status: 500 });
     }
 }
