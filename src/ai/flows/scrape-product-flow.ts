@@ -6,7 +6,15 @@
  * - ScrapedProductData - The type of the data returned by the scraping flow.
  */
 import { z } from 'zod';
-import { ai } from '@/ai/genkit'; // Import the initialized AI instance
+import { genkit } from '@genkit-ai/core';
+import { googleAI } from '@genkit-ai/google-genai';
+
+// Initialize the Genkit instance directly within the server action file.
+// This resolves complex module resolution issues with Next.js.
+const ai = genkit({
+  plugins: [googleAI()],
+});
+
 
 const ScrapeProductInputSchema = z.object({
   htmlContent: z.string().describe("The full HTML content of the product page."),
