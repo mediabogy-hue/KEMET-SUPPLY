@@ -91,7 +91,7 @@ service cloud.firestore {
         (isMerchant() && get(/databases/$(database)/documents/products/$(resource.data.productId)).data.merchantId == request.auth.uid)
       );
       // Order manager can update anything. Merchant can only update status.
-      allow update: if isOrdersManager() || (isMerchant() && get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.merchantId == request.auth.uid);
+      allow update: if isOrdersManager() || (isMerchant() && get(/databases/$(database)/documents/products/$(resource.data.productId)).data.merchantId == request.auth.uid);
       allow delete: if isAdmin();
     }
 
