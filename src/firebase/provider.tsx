@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useMemo, type ReactNode } from 'react';
+import React, { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { FirebaseApp } from 'firebase/app';
 import type { Firestore } from 'firebase/firestore';
 import type { Auth } from 'firebase/auth';
@@ -30,3 +30,12 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     </FirebaseContext.Provider>
   );
 }
+
+// Define and export useFirebase hook from here
+export const useFirebase = (): FirebaseContextState => {
+  const context = useContext(FirebaseContext);
+  if (context === undefined) {
+    throw new Error('useFirebase must be used within a FirebaseProvider.');
+  }
+  return context;
+};
