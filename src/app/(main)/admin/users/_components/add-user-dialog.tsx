@@ -147,17 +147,23 @@ export function AddUserDialog() {
       };
       batch.set(userDocRef, userProfileData);
 
-      if (role !== 'Dropshipper') {
-        const staffRolesMap: Partial<Record<UserProfile['role'], string>> = {
-            'Admin': 'roles_admin',
-            'OrdersManager': 'roles_orders_manager',
-            'FinanceManager': 'roles_finance_manager',
-        };
-        const roleCollection = staffRolesMap[role];
-        if (roleCollection) {
-            const roleDocRef = doc(firestore, roleCollection, newUser.uid);
-            batch.set(roleDocRef, { createdAt: serverTimestamp() });
-        }
+      const staffRolesMap: Partial<Record<UserProfile['role'], string>> = {
+          'Admin': 'roles_admin',
+          'OrdersManager': 'roles_orders_manager',
+          'FinanceManager': 'roles_finance_manager',
+          'Merchant': 'roles_merchant',
+      };
+
+      // Clear any old roles if they exist (belt-and-suspenders)
+      Object.values(staffRolesMap).forEach(roleCollection => {
+          batch.delete(doc(firestore, roleCollection, newUser.uid));
+      });
+
+      // Set the new role
+      const newRoleCollection = staffRolesMap[role];
+      if (newRoleCollection) {
+          const roleDocRef = doc(firestore, newRoleCollection, newUser.uid);
+          batch.set(roleDocRef, { createdAt: serverTimestamp() });
       }
 
       await batch.commit();
@@ -302,6 +308,7 @@ export function AddUserDialog() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="Dropshipper">مسوق</SelectItem>
+                            <SelectItem value="Merchant">تاجر</SelectItem>
                             {isAdmin && <SelectItem value="Admin">أدمن</SelectItem>}
                             <SelectItem value="OrdersManager">مدير طلبات</SelectItem>
                             <SelectItem value="FinanceManager">مدير مالي</SelectItem>

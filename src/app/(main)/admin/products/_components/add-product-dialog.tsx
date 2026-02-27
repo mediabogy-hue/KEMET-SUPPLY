@@ -186,6 +186,8 @@ export function AddProductDialog() {
           imageUrls: parsedImageUrls,
           videoUrl: videoUrl,
           purchaseUrl: purchaseUrl,
+          merchantId: profile?.role === 'Merchant' ? user.uid : null,
+          merchantName: profile?.role === 'Merchant' ? `${profile.firstName} ${profile.lastName}`.trim() : 'Kemet Supply',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         };

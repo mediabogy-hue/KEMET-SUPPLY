@@ -53,6 +53,8 @@ export interface Product {
   purchaseUrl?: string;
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  merchantId?: string | null;
+  merchantName?: string | null;
 }
 
 export interface ProductCategory {
@@ -101,6 +103,9 @@ export interface Order {
   // Shipment link
   shipmentId?: string | null;
   shipmentTrackingNumber?: string | null;
+  // Merchant Info
+  merchantId?: string | null;
+  merchantName?: string | null;
 }
 
 export interface Wallet {

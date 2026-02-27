@@ -10,7 +10,7 @@ import type { UserProfile } from '@/lib/types';
 export interface SessionContextState {
   user: User | null;
   profile: UserProfile | null;
-  role: 'Dropshipper' | 'Admin' | 'OrdersManager' | 'FinanceManager' | null;
+  role: 'Dropshipper' | 'Admin' | 'OrdersManager' | 'FinanceManager' | 'Merchant' | null;
   isLoading: boolean;
   error: Error | null;
   isAdmin: boolean;
@@ -40,9 +40,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         unsubscribeProfile = undefined;
       }
       
-      // Do NOT set loading back to true here. This was the source of the infinite loop.
-      // We only transition from true -> false once.
-
       if (authUser) {
         // User is authenticated, now try to fetch their profile.
         const profileDocRef = doc(firestore, 'users', authUser.uid);
@@ -90,27 +87,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [auth, firestore]);
 
   const contextValue = useMemo((): SessionContextState => {
-    let normalizedRole = profile?.role || null;
-    // Handle legacy 'Merchant' role to prevent loops
-    if (normalizedRole === 'Merchant') {
-      normalizedRole = 'Dropshipper';
-    }
-    
-    const originalRole = profile?.role || null;
-    const isAdmin = normalizedRole === 'Admin';
+    const role = profile?.role || null;
+    const isAdmin = role === 'Admin';
 
     return {
       user,
       profile,
       isLoading,
       error,
-      role: normalizedRole as SessionContextState['role'],
+      role,
       isAdmin,
-      isOrdersManager: normalizedRole === 'OrdersManager' || isAdmin,
-      isFinanceManager: normalizedRole === 'FinanceManager' || isAdmin,
-      isMerchant: originalRole === 'Merchant',
-      isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(normalizedRole || ''),
-      isDropshipper: normalizedRole === 'Dropshipper',
+      isOrdersManager: role === 'OrdersManager' || isAdmin,
+      isFinanceManager: role === 'FinanceManager' || isAdmin,
+      isMerchant: role === 'Merchant',
+      isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(role || ''),
+      isDropshipper: role === 'Dropshipper',
       firestore,
     };
   }, [user, profile, isLoading, error, firestore]);

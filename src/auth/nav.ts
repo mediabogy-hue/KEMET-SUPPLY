@@ -50,6 +50,32 @@ export const navLinks: NavLink[] = [
         roles: ['Dropshipper'],
     },
 
+    // Merchant Links
+    {
+        href: "/merchant/dashboard",
+        label: "لوحة التحكم",
+        icon: React.createElement(LayoutDashboard),
+        roles: ['Merchant'],
+    },
+    {
+        href: "/merchant/products",
+        label: "منتجاتي",
+        icon: React.createElement(Store),
+        roles: ['Merchant'],
+    },
+    {
+        href: "/merchant/orders",
+        label: "طلبات منتجاتي",
+        icon: React.createElement(ShoppingCart),
+        roles: ['Merchant'],
+    },
+    {
+        href: "/merchant/inventory",
+        label: "المخزون",
+        icon: React.createElement(Package),
+        roles: ['Merchant'],
+    },
+
     // Admin & Staff Links
     {
         href: "/admin/dashboard",

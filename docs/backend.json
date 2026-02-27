@@ -22,7 +22,8 @@
             "Dropshipper",
             "Admin",
             "OrdersManager",
-            "FinanceManager"
+            "FinanceManager",
+            "Merchant"
           ]
         },
         "firstName": {
@@ -57,6 +58,28 @@
         "updatedAt",
         "isActive"
       ]
+    },
+    "Product": {
+      "title": "Product",
+      "type": "object",
+      "description": "Represents a product listed on the platform.",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "merchantId": { "type": "string", "description": "The ID of the Merchant who owns this product." }
+      }
+    },
+    "Order": {
+      "title": "Order",
+      "type": "object",
+      "description": "Represents a customer order.",
+      "properties": {
+        "id": { "type": "string" },
+        "productId": { "type": "string" },
+        "dropshipperId": { "type": "string" },
+        "merchantId": { "type": "string" }
+      }
     }
   },
   "auth": {
@@ -69,7 +92,19 @@
       "schema": {
         "$ref": "#/entities/User"
       },
-      "description": "Stores public information about a user."
+      "description": "Stores user profiles."
+    },
+    "/products/{productId}": {
+      "schema": {
+        "$ref": "#/entities/Product"
+      },
+      "description": "Stores product details."
+    },
+    "/orders/{orderId}": {
+      "schema": {
+        "$ref": "#/entities/Order"
+      },
+      "description": "Stores order details."
     },
     "/roles_admin/{userId}": {
       "schema": {
@@ -91,6 +126,13 @@
         "properties": {}
       },
       "description": "A document in this collection grants a user the Finance Manager role."
+    },
+    "/roles_merchant/{userId}": {
+      "schema": {
+        "type": "object",
+        "properties": {}
+      },
+      "description": "A document in this collection grants a user the Merchant role."
     }
   }
 }

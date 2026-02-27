@@ -1,4 +1,3 @@
-
 import type { UserProfile } from '@/lib/types';
 
 export type UserRole = UserProfile['role'];
@@ -9,6 +8,7 @@ const PERMISSIONS: Record<UserRole, string[]> = {
   OrdersManager: ['/admin/orders', '/admin/shipping', '/admin/dashboard'],
   FinanceManager: ['/admin/withdrawals', '/admin/payments', '/admin/dashboard'],
   Dropshipper: ['/dashboard', '/products', '/orders', '/reports', '/profile', '/policy'],
+  Merchant: ['/merchant/dashboard', '/merchant/products', '/merchant/orders', '/merchant/inventory', '/profile'],
 };
 
 // Common paths accessible by any authenticated user
@@ -24,6 +24,12 @@ export function hasPermission(role: UserRole | null, path: string): boolean {
   if (role === 'Admin' && path.startsWith('/admin')) {
     return true;
   }
+  
+  // Handle /merchant path for merchants
+  if (role === 'Merchant' && path.startsWith('/merchant')) {
+    return true;
+  }
+
 
   const allowedPaths = PERMISSIONS[role] || [];
   return allowedPaths.some(p => path.startsWith(p));
@@ -34,6 +40,7 @@ export function getDefaultPath(role: UserRole | null): string {
   if (role === 'OrdersManager') return '/admin/orders';
   if (role === 'FinanceManager') return '/admin/withdrawals';
   if (role === 'Dropshipper') return '/dashboard';
+  if (role === 'Merchant') return '/merchant/dashboard';
   
   // Default fallback for unhandled or null roles
   return '/login';

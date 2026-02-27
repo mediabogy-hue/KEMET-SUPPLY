@@ -93,6 +93,8 @@ export default function NewOrderPage() {
       status: "Pending",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      merchantId: selectedProduct.merchantId || null,
+      merchantName: selectedProduct.merchantName || null,
     };
 
     try {

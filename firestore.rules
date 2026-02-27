@@ -23,6 +23,10 @@ service cloud.firestore {
     function isFinanceManager() {
       return exists(/databases/$(database)/documents/roles_finance_manager/$(request.auth.uid));
     }
+    
+    function isMerchant() {
+        return exists(/databases/$(database)/documents/roles_merchant/$(request.auth.uid));
+    }
 
     function isStaff() {
       return isAdmin() || isOrdersManager() || isFinanceManager();
@@ -49,8 +53,6 @@ service cloud.firestore {
     }
 
     // Role documents for permission checks.
-    // This is a hardened rule to prevent any recursion.
-    // `exists()` calls in functions do not require `get` permission.
     match /roles_admin/{userId} { 
         allow get: if isOwner(userId);
         allow write, list, delete: if isAdmin();
@@ -63,6 +65,10 @@ service cloud.firestore {
         allow get: if isOwner(userId);
         allow write, list, delete: if isAdmin();
     }
+    match /roles_merchant/{userId} {
+        allow get: if isOwner(userId);
+        allow write, list, delete: if isAdmin();
+    }
     
     // Public Settings
     match /publicSettings/{docId} {
@@ -72,8 +78,11 @@ service cloud.firestore {
 
     // Products and Categories
     match /products/{productId} {
-        allow read: if isSignedIn(); // Allow any signed-in user to read products.
-        allow create, update, delete: if isAdmin();
+        allow read: if isSignedIn();
+        allow create: if isAdmin() || isMerchant();
+        // Merchant can only update their own products. Admin can update any.
+        allow update: if isAdmin() || (isMerchant() && resource.data.merchantId == request.auth.uid);
+        allow delete: if isAdmin() || (isMerchant() && resource.data.merchantId == request.auth.uid);
     }
     match /productCategories/{categoryId} {
         allow read: if isSignedIn();
@@ -88,8 +97,14 @@ service cloud.firestore {
     // Orders
     match /orders/{orderId} {
       allow create: if (isSignedIn() && request.resource.data.dropshipperId == request.auth.uid) || request.auth == null;
-      allow read: if isSignedIn(); // Allow reading, client-side queries will filter what is visible. This unblocks list calls.
-      allow update: if isOrdersManager();
+      allow list: if isSignedIn(); // Allow list queries for all signed-in users
+      allow get: if isSignedIn() && (
+        resource.data.dropshipperId == request.auth.uid || 
+        isStaff() ||
+        (isMerchant() && get(/databases/$(database)/documents/products/$(resource.data.productId)).data.merchantId == request.auth.uid)
+      );
+      // Order manager can update anything. Merchant can only update status.
+      allow update: if isOrdersManager() || (isMerchant() && get(/databases/$(database)/documents/products/$(request.resource.data.productId)).data.merchantId == request.auth.uid);
       allow delete: if isAdmin();
     }
 
@@ -118,7 +133,7 @@ service cloud.firestore {
     // Stock Ledger
     match /stockLedger/{ledgerId} {
         allow read, list: if isAdmin();
-        allow create: if isAdmin();
+        allow create: if isAdmin() || isMerchant();
         allow update, delete: if false;
     }
 

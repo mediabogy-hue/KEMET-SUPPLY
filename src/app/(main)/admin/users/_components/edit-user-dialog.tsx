@@ -87,19 +87,20 @@ export function EditUserDialog({ user, isOpen, onOpenChange }: EditUserDialogPro
     const newRole = role;
 
     if (oldRole !== newRole) {
-        const staffRolesMap: Partial<Record<UserProfile['role'], string>> = {
+        const allRolesMap: Partial<Record<UserProfile['role'], string>> = {
             'Admin': 'roles_admin',
             'OrdersManager': 'roles_orders_manager',
             'FinanceManager': 'roles_finance_manager',
+            'Merchant': 'roles_merchant',
         };
 
-        const oldRoleCollection = staffRolesMap[oldRole];
+        const oldRoleCollection = allRolesMap[oldRole];
         if (oldRoleCollection) {
             const oldRoleDocRef = doc(firestore, oldRoleCollection, user.id);
             batch.delete(oldRoleDocRef);
         }
-
-        const newRoleCollection = staffRolesMap[newRole];
+        
+        const newRoleCollection = allRolesMap[newRole];
         if (newRoleCollection) {
             const newRoleDocRef = doc(firestore, newRoleCollection, user.id);
             batch.set(newRoleDocRef, { createdAt: serverTimestamp() });
@@ -193,6 +194,7 @@ export function EditUserDialog({ user, isOpen, onOpenChange }: EditUserDialogPro
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="Dropshipper">مسوق</SelectItem>
+                    <SelectItem value="Merchant">تاجر</SelectItem>
                     <SelectItem value="Admin">أدمن</SelectItem>
                     <SelectItem value="OrdersManager">مدير طلبات</SelectItem>
                     <SelectItem value="FinanceManager">مدير مالي</SelectItem>
