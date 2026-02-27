@@ -38,6 +38,12 @@ const nextConfig = {
         hostname: "media.taager.com",
         port: "",
         pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "m.media-amazon.com",
+        port: "",
+        pathname: "/**",
       }
     ],
   },
