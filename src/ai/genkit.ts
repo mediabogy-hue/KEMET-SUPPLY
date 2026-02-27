@@ -1,12 +1,2 @@
-'use server';
-
-import { genkit } from '@genkit-ai/core';
-import { googleAI } from '@genkit-ai/google-genai';
-
-/**
- * Centralized Genkit initialization.
- * This ensures that Genkit is configured once in a server-only context.
- */
-export const ai = genkit({
-  plugins: [googleAI()],
-});
+// This file is no longer needed and has been intentionally left blank.
+// The logic has been moved to the API route to prevent build conflicts.
