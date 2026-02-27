@@ -6,8 +6,8 @@ export async function POST(req: Request) {
     try {
         const { productUrl, categoryNames } = await req.json();
 
-        if (!productUrl || !categoryNames) {
-            return NextResponse.json({ error: 'Missing productUrl or categoryNames' }, { status: 400 });
+        if (!productUrl || !Array.isArray(categoryNames)) {
+            return NextResponse.json({ error: 'Missing or invalid productUrl or categoryNames' }, { status: 400 });
         }
 
         const scrapedData = await scrapeProductFromUrl(productUrl, categoryNames);

@@ -6,8 +6,7 @@
  * - ScrapedProductData - The type of the data returned by the scraping flow.
  */
 import { z } from 'zod';
-import { genkit } from '@genkit-ai/core';
-import { googleAI } from '@genkit-ai/google-genai';
+import { ai } from '@/ai/genkit';
 
 
 const ScrapedProductDataSchema = z.object({
@@ -27,83 +26,77 @@ const ScrapeProductInputSchema = z.object({
 });
 
 
+const scrapePrompt = ai.definePrompt({
+    name: 'scrapeProductPrompt',
+    input: { schema: ScrapeProductInputSchema },
+    output: { schema: ScrapedProductDataSchema },
+    prompt: `You are an expert web scraper and product categorizer. Your task is to extract product information from the provided HTML content and classify it into the most relevant category.
+  The HTML has been pre-processed to remove scripts, styles, and other irrelevant tags.
+  Focus on the main content area to find the product details.
+
+  Please extract the following details precisely:
+  1.  **Product Name**: Find the main heading or title of the product. This is often inside an <h1> tag, but could be in another prominent element.
+  2.  **Product Description**: Find the most detailed product description available. It might be in multiple paragraphs or a dedicated description section. Combine them into one string.
+  3.  **Price**: Find the product's price. Extract only the numerical value, removing any currency symbols (like "EGP" or "ج.م"), text, or commas. For example, if the price is "1,250.50 EGP", extract 1250.50.
+  4.  **Image URLs**: Find all *main* product images. If you find relative URLs (e.g., /images/product.jpg), you MUST convert them to absolute URLs using the provided product URL as the base: {{{productUrl}}}. Only include full, valid URLs. Do not include thumbnails or logos unless they are the only images available.
+  5.  **Category**: Based on the product's name and description, choose the *single most appropriate* category from the following list. You must return one of these exact strings.
+      Available Categories: {{#each categoryNames}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
+
+  HTML Content:
+  \`\`\`html
+  {{{htmlContent}}}
+  \`\`\`
+
+  IMPORTANT: Return the result as a valid JSON object. If you cannot find a piece of information, you MUST return an empty string for string fields, 0 for the price, and an empty array for image URLs. For category, if you cannot determine a suitable one, you must still choose the most likely category from the provided list. Do not omit any fields. Your response MUST be a single JSON object and nothing else.`,
+    config: {
+        temperature: 0.0,
+    },
+    model: 'gemini-1.5-pro-latest'
+});
+
+const scrapeProductFlow = ai.defineFlow(
+  {
+    name: 'scrapeProductFlow',
+    inputSchema: ScrapeProductInputSchema,
+    outputSchema: ScrapedProductDataSchema,
+  },
+  async ({ htmlContent, categoryNames, productUrl }) => {
+    
+    // 1. Extract only the body content to reduce noise and context size.
+    const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
+
+    // 2. Advanced sanitization to remove irrelevant tags and reduce whitespace.
+    let cleanedHtml = bodyContent
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+        .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
+        .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
+        .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
+        .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
+        .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
+        .replace(/<!--[\s\S]*?-->/g, ' ');
+
+    // 3. Reduce whitespace and then truncate to fit within the model's context window.
+    const simplifiedHtml = cleanedHtml.replace(/\s\s+/g, ' ').substring(0, 200000);
+
+    const { output } = await scrapePrompt({ htmlContent: simplifiedHtml, categoryNames, productUrl });
+
+    if (!output) {
+      throw new Error('فشل تحليل بيانات المنتج من استجابة الذكاء الاصطناعي. قد يكون المحتوى غير متوافق أو أن النموذج لم يتمكن من إرجاع بيانات صالحة.');
+    }
+    
+    // Loosen validation for image URLs
+    const validatedOutput = ScrapedProductDataSchema.omit({ imageUrls: true }).extend({
+        imageUrls: z.array(z.string())
+    }).parse(output);
+
+    return validatedOutput;
+  }
+);
+  
 // This is the server action that the client will call.
 export async function scrapeProductFromUrl(productUrl: string, categoryNames: string[]): Promise<ScrapedProductData> {
-  
-  // Initialize Genkit and define flows INSIDE the function body to prevent bundling issues.
-  const ai = genkit({
-    plugins: [googleAI()],
-  });
-
-  const scrapePrompt = ai.definePrompt({
-      name: 'scrapeProductPrompt',
-      input: { schema: ScrapeProductInputSchema },
-      output: { schema: ScrapedProductDataSchema },
-      prompt: `You are an expert web scraper and product categorizer. Your task is to extract product information from the provided HTML content and classify it into the most relevant category.
-    The HTML has been pre-processed to remove scripts, styles, and other irrelevant tags.
-    Focus on the main content area to find the product details.
-
-    Please extract the following details precisely:
-    1.  **Product Name**: Find the main heading or title of the product. This is often inside an <h1> tag, but could be in another prominent element.
-    2.  **Product Description**: Find the most detailed product description available. It might be in multiple paragraphs or a dedicated description section. Combine them into one string.
-    3.  **Price**: Find the product's price. Extract only the numerical value, removing any currency symbols (like "EGP" or "ج.م"), text, or commas. For example, if the price is "1,250.50 EGP", extract 1250.50.
-    4.  **Image URLs**: Find all *main* product images. If you find relative URLs (e.g., /images/product.jpg), you MUST convert them to absolute URLs using the provided product URL as the base: {{{productUrl}}}. Only include full, valid URLs. Do not include thumbnails or logos unless they are the only images available.
-    5.  **Category**: Based on the product's name and description, choose the *single most appropriate* category from the following list. You must return one of these exact strings.
-        Available Categories: {{#each categoryNames}}{{{this}}}{{#unless @last}}, {{/unless}}{{/each}}
-
-    HTML Content:
-    \`\`\`html
-    {{{htmlContent}}}
-    \`\`\`
-
-    IMPORTANT: Return the result as a valid JSON object. If you cannot find a piece of information, you MUST return an empty string for string fields, 0 for the price, and an empty array for image URLs. For category, if you cannot determine a suitable one, you must still choose the most likely category from the provided list. Do not omit any fields. Your response MUST be a single JSON object and nothing else.`,
-      config: {
-          temperature: 0.0,
-      },
-      model: 'gemini-1.5-pro-latest'
-  });
-
-  const scrapeProductFlow = ai.defineFlow(
-    {
-      name: 'scrapeProductFlow',
-      inputSchema: ScrapeProductInputSchema,
-      outputSchema: ScrapedProductDataSchema,
-    },
-    async ({ htmlContent, categoryNames, productUrl }) => {
-      
-      // 1. Extract only the body content to reduce noise and context size.
-      const bodyMatch = htmlContent.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-      const bodyContent = bodyMatch ? bodyMatch[1] : htmlContent;
-
-      // 2. Advanced sanitization to remove irrelevant tags and reduce whitespace.
-      let cleanedHtml = bodyContent
-          .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-          .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-          .replace(/<svg\b[^<]*(?:(?!<\/svg>)<[^<]*)*<\/svg>/gi, ' ')
-          .replace(/<nav\b[^<]*(?:(?!<\/nav>)<[^<]*)*<\/nav>/gi, ' ')
-          .replace(/<header\b[^<]*(?:(?!<\/header>)<[^<]*)*<\/header>/gi, ' ')
-          .replace(/<footer\b[^<]*(?:(?!<\/footer>)<[^<]*)*<\/footer>/gi, ' ')
-          .replace(/<aside\b[^<]*(?:(?!<\/aside>)<[^<]*)*<\/aside>/gi, ' ')
-          .replace(/<!--[\s\S]*?-->/g, ' ');
-
-      // 3. Reduce whitespace and then truncate to fit within the model's context window.
-      const simplifiedHtml = cleanedHtml.replace(/\s\s+/g, ' ').substring(0, 200000);
-
-      const { output } = await scrapePrompt({ htmlContent: simplifiedHtml, categoryNames, productUrl });
-
-      if (!output) {
-        throw new Error('فشل تحليل بيانات المنتج من استجابة الذكاء الاصطناعي. قد يكون المحتوى غير متوافق أو أن النموذج لم يتمكن من إرجاع بيانات صالحة.');
-      }
-      
-      // Loosen validation for image URLs
-      const validatedOutput = ScrapedProductDataSchema.omit({ imageUrls: true }).extend({
-          imageUrls: z.array(z.string())
-      }).parse(output);
-
-      return validatedOutput;
-    }
-  );
-  
   if (!productUrl) {
     throw new Error('Product URL cannot be empty.');
   }

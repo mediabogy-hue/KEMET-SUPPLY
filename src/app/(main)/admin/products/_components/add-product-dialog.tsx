@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import { useState } from "react";
@@ -225,7 +223,7 @@ export function AddProductDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-        if (isSubmitting) return;
+        if (isSubmitting || isImporting) return;
         setIsOpen(open);
         if (!open) resetForm();
     }}>
@@ -252,9 +250,9 @@ export function AddProductDialog() {
                         placeholder="https://example.com/product-page"
                         value={importUrl}
                         onChange={(e) => setImportUrl(e.target.value)}
-                        disabled={isImporting}
+                        disabled={isImporting || isSubmitting}
                     />
-                    <Button onClick={handleImportFromUrl} disabled={isImporting || categoriesLoading}>
+                    <Button onClick={handleImportFromUrl} disabled={isImporting || categoriesLoading || isSubmitting}>
                         {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'جلب البيانات'}
                     </Button>
                 </div>
@@ -267,62 +265,62 @@ export function AddProductDialog() {
                 <Label htmlFor="name" className="text-right">
                   الاسم
                 </Label>
-                <Input id="name" placeholder="مثال: سماعة لاسلكية" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3"/>
+                <Input id="name" placeholder="مثال: سماعة لاسلكية" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="category" className="text-right">
                     الفئة
                 </Label>
-                <Input id="category" placeholder="اكتب اسم فئة جديدة أو موجودة" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3"/>
+                <Input id="category" placeholder="اكتب اسم فئة جديدة أو موجودة" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
                </div>
                <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="description" className="text-right pt-2">
                   الوصف
                 </Label>
-                <Textarea id="description" placeholder="وصف مختصر ومفيد للمنتج" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" rows={4}/>
+                <Textarea id="description" placeholder="وصف مختصر ومفيد للمنتج" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" rows={4} disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="price" className="text-right">
                   السعر (ج.م)
                 </Label>
-                <Input id="price" type="number" placeholder="99.99" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3"/>
+                <Input id="price" type="number" placeholder="99.99" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="commission" className="text-right">
                   العمولة (ج.م)
                 </Label>
-                <Input id="commission" type="number" placeholder="10.00" value={commission} onChange={(e) => setCommission(e.target.value)} className="col-span-3"/>
+                <Input id="commission" type="number" placeholder="10.00" value={commission} onChange={(e) => setCommission(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="stockQuantity" className="text-right">
                   الكمية المتاحة
                 </Label>
-                <Input id="stockQuantity" type="number" placeholder="100" value={stockQuantity} onChange={(e) => setStockQuantity(e.target.value)} className="col-span-3"/>
+                <Input id="stockQuantity" type="number" placeholder="100" value={stockQuantity} onChange={(e) => setStockQuantity(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="imageUrls" className="text-right pt-2">
                   روابط الصور
                 </Label>
-                <Textarea id="imageUrls" placeholder="ضع كل رابط في سطر منفصل" value={imageUrls} onChange={(e) => setImageUrls(e.target.value)} className="col-span-3" rows={4}/>
+                <Textarea id="imageUrls" placeholder="ضع كل رابط في سطر منفصل" value={imageUrls} onChange={(e) => setImageUrls(e.target.value)} className="col-span-3" rows={4} disabled={isSubmitting}/>
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="videoUrl" className="text-right">
                   رابط الفيديو
                 </Label>
-                <Input id="videoUrl" placeholder="https://example.com/video.mp4" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="col-span-3"/>
+                <Input id="videoUrl" placeholder="https://example.com/video.mp4" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="purchaseUrl" className="text-right">
                   رابط الشراء
                 </Label>
-                <Input id="purchaseUrl" placeholder="https://supplier.com/product (اختياري)" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} className="col-span-3"/>
+                <Input id="purchaseUrl" placeholder="https://supplier.com/product (اختياري)" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} className="col-span-3" disabled={isSubmitting}/>
               </div>
                <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="isAvailable" className="text-right">
                   الحالة
                 </Label>
                 <div className="col-span-3 flex items-center gap-2">
-                    <Switch id="isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable}/>
+                    <Switch id="isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable} disabled={isSubmitting}/>
                     <span>{isAvailable ? "نشط" : "غير نشط"}</span>
                 </div>
               </div>
@@ -331,9 +329,9 @@ export function AddProductDialog() {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={isSubmitting}>إلغاء</Button>
+            <Button variant="outline" disabled={isSubmitting || isImporting}>إلغاء</Button>
           </DialogClose>
-          <Button type="button" onClick={handleSaveProduct} disabled={isSubmitting}>
+          <Button type="button" onClick={handleSaveProduct} disabled={isSubmitting || isImporting}>
             {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'جاري الحفظ...' : 'حفظ المنتج'}
           </Button>
