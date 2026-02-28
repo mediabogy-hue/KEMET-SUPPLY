@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,13 +14,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, errorEmitter, FirestorePermissionError, useCollection, useMemoFirebase } from "@/firebase";
+import { useFirestore, useStorage, useCollection, useMemoFirebase } from "@/firebase";
 import { doc, updateDoc, serverTimestamp, collection, query, orderBy, writeBatch } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Briefcase, Loader2, Globe, Sparkles } from "lucide-react";
+import { Loader2, Upload, Trash2 } from "lucide-react";
 import { useSession } from "@/auth/SessionProvider";
+import { ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { compressImage } from "@/lib/utils";
+import Image from "next/image";
 
 
 interface EditProductDialogProps {
@@ -31,11 +34,12 @@ interface EditProductDialogProps {
 
 export function EditProductDialog({ product, isOpen, onOpenChange }: EditProductDialogProps) {
   const firestore = useFirestore();
+  const storage = useStorage();
   const { user, profile } = useSession();
   const { toast } = useToast();
 
-  const categoriesQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "productCategories"), orderBy("name", "asc")) : null, [firestore, user]);
-  const { data: categories } = useCollection<ProductCategory>(categoriesQuery);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // Product state
   const [name, setName] = useState("");
@@ -44,17 +48,18 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
   const [price, setPrice] = useState("");
   const [commission, setCommission] = useState("");
   const [stockQuantity, setStockQuantity] = useState("");
-  const [imageUrls, setImageUrls] = useState("");
-  const [videoUrl, setVideoUrl] = useState("");
   const [purchaseUrl, setPurchaseUrl] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
 
-  // Scrape state
-  const [scrapeUrl, setScrapeUrl] = useState("");
-  const [isScraping, setIsScraping] = useState(false);
-
+  // File state
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
+  const [newVideoFile, setNewVideoFile] = useState<File | null>(null);
+  
   // Control state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   useEffect(() => {
     if (product) {
@@ -64,133 +69,98 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
         setPrice(product.price?.toString() || "");
         setCommission(product.commission?.toString() || "");
         setStockQuantity(product.stockQuantity?.toString() || "");
-        setImageUrls(product.imageUrls?.join('\n') || "");
-        setVideoUrl(product.videoUrl || "");
+        setImageUrls(product.imageUrls || []);
+        setVideoUrl(product.videoUrl || null);
         setPurchaseUrl(product.purchaseUrl || "");
         setIsAvailable(product.isAvailable);
-    }
-  }, [product]);
 
-  const handleScrape = async () => {
-    if (!scrapeUrl) {
-      toast({ variant: 'destructive', title: 'الرجاء إدخال رابط' });
-      return;
-    }
-    setIsScraping(true);
-    try {
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: scrapeUrl }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'فشل جلب البيانات');
-      }
+        // Reset file inputs when a new product is loaded
+        setNewImageFiles([]);
+        setNewVideoFile(null);
+        setUploadProgress(0);
 
-      const data = await response.json();
-      
-      // Populate form fields
-      setName(data.name || '');
-      setDescription(data.description || '');
-      setPrice(data.price?.toString() || '');
-      setImageUrls(data.imageUrls?.join('\n') || '');
-      setCategory(data.category || '');
-      
-      toast({ title: 'تم جلب البيانات بنجاح!', description: 'البيانات الحالية تم استبدالها بالبيانات الجديدة.' });
-
-    } catch (error: any) {
-      toast({ variant: 'destructive', title: 'خطأ أثناء جلب البيانات', description: error.message });
-    } finally {
-      setIsScraping(false);
     }
+  }, [product, isOpen]);
+
+  const handleRemoveImage = (urlToRemove: string) => {
+    setImageUrls(prev => prev.filter(url => url !== urlToRemove));
   };
 
   const handleUpdateProduct = async () => {
-    if (!product || !firestore || !profile) return;
-
-    const priceNumber = parseFloat(price);
-    const commissionNumber = parseFloat(commission);
-    const quantityNumber = parseInt(stockQuantity, 10);
-
-    if (!name || !description || isNaN(priceNumber) || isNaN(quantityNumber) || isNaN(commissionNumber) || !category) {
-      toast({
-        variant: "destructive",
-        title: "خطأ",
-        description: "الرجاء ملء جميع الحقول المطلوبة بقيم صحيحة، بما في ذلك الفئة.",
-      });
-      return;
-    }
-    
-    if (priceNumber <= 0 || quantityNumber < 0 || commissionNumber < 0) {
-        toast({
-            variant: "destructive",
-            title: "خطأ في الإدخال",
-            description: "السعر، العمولة، والكمية يجب أن تكون أرقامًا موجبة.",
-        });
-        return;
-    }
+    if (!product || !firestore || !profile || !storage) return;
 
     setIsSubmitting(true);
+    setUploadProgress(0);
     
     try {
-        const batch = writeBatch(firestore);
-        const finalCategoryName = category.trim();
+        let finalImageUrls = [...imageUrls];
+        let finalVideoUrl = videoUrl;
 
-        const existingCategory = categories?.find(c => c.name.trim().toLowerCase() === finalCategoryName.toLowerCase());
+        const totalFiles = newImageFiles.length + (newVideoFile ? 1 : 0);
+        let filesUploaded = 0;
 
-        if (!existingCategory && finalCategoryName) {
-            if (profile.role === 'Admin') {
-                const categoryId = doc(collection(firestore, "productCategories")).id;
-                const categoryDocRef = doc(firestore, "productCategories", categoryId);
-                const newCategoryData = {
-                  id: categoryId,
-                  name: finalCategoryName,
-                  imageUrl: `https://picsum.photos/seed/${encodeURIComponent(finalCategoryName)}/200`,
-                  dataAiHint: finalCategoryName.split(" ").slice(0, 2).join(" "),
-                  isAvailable: true,
-                  createdAt: serverTimestamp(),
-                  updatedAt: serverTimestamp(),
-                };
-                batch.set(categoryDocRef, newCategoryData);
-            } else {
-                 toast({
-                    variant: "destructive",
-                    title: "فئة غير موجودة",
-                    description: `الفئة "${finalCategoryName}" غير موجودة. لا يمكنك إنشاء فئات جديدة.`,
+        if (newImageFiles.length > 0) {
+            const imageUploadPromises = newImageFiles.map(async (file) => {
+                const compressedBlob = await compressImage(file, { maxWidth: 1024, quality: 0.8 });
+                const fileRef = storageRef(storage, `products/${product.id}/${Date.now()}-${file.name}`);
+                const uploadTask = uploadBytesResumable(fileRef, compressedBlob);
+
+                return new Promise<string>((resolve, reject) => {
+                    uploadTask.on('state_changed',
+                        (snapshot) => {},
+                        (error) => reject(error),
+                        async () => {
+                            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                            filesUploaded++;
+                            setUploadProgress((filesUploaded / totalFiles) * 100);
+                            resolve(downloadURL);
+                        }
+                    );
                 });
-                setIsSubmitting(false);
-                return;
-            }
+            });
+            const newUrls = await Promise.all(imageUploadPromises);
+            finalImageUrls.push(...newUrls);
+        }
+
+        if (newVideoFile) {
+             const fileRef = storageRef(storage, `products/${product.id}/${Date.now()}-${newVideoFile.name}`);
+             const uploadTask = uploadBytesResumable(fileRef, newVideoFile);
+             finalVideoUrl = await new Promise<string>((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    (snapshot) => {},
+                    (error) => reject(error),
+                    async () => {
+                        const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                        filesUploaded++;
+                        setUploadProgress((filesUploaded / totalFiles) * 100);
+                        resolve(downloadURL);
+                    });
+             });
         }
 
         const productDocRef = doc(firestore, "products", product.id);
-        const parsedImageUrls = imageUrls.split('\n').map(url => url.trim()).filter(Boolean);
-
+        
         const updatedData: any = {
           name,
-          category: finalCategoryName,
+          category,
           description,
-          price: priceNumber,
-          commission: commissionNumber,
-          stockQuantity: quantityNumber,
+          price: parseFloat(price) || 0,
+          commission: parseFloat(commission) || 0,
+          stockQuantity: parseInt(stockQuantity, 10) || 0,
           isAvailable,
           purchaseUrl,
-          imageUrls: parsedImageUrls,
-          videoUrl: videoUrl,
+          imageUrls: finalImageUrls,
+          videoUrl: finalVideoUrl,
           updatedAt: serverTimestamp(),
         };
 
-        batch.update(productDocRef, updatedData);
-        
-        await batch.commit();
+        await updateDoc(productDocRef, updatedData);
         onOpenChange(false);
     } catch (error: any) {
         toast({
             variant: "destructive",
             title: "فشل تحديث المنتج",
-            description: "قد لا تملك الصلاحيات الكافية.",
+            description: error.message || "قد لا تملك الصلاحيات الكافية.",
         });
     } finally {
         setIsSubmitting(false);
@@ -212,89 +182,83 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-[60vh] overflow-y-auto px-2 space-y-4">
-            <div className="space-y-2 rounded-lg border p-4">
-                <Label htmlFor="scrape-url-edit" className="flex items-center gap-2 font-semibold">
-                    <Sparkles className="text-primary" />
-                    استبدال البيانات من رابط
-                </Label>
-                <div className="flex gap-2">
-                    <Input 
-                        id="scrape-url-edit"
-                        placeholder="الصق رابط منتج جديد..."
-                        value={scrapeUrl}
-                        onChange={(e) => setScrapeUrl(e.target.value)}
-                        disabled={isScraping || isSubmitting}
-                    />
-                    <Button type="button" onClick={handleScrape} disabled={isScraping || isSubmitting}>
-                        {isScraping ? <Loader2 className="animate-spin"/> : <Globe />}
-                    </Button>
-                </div>
-            </div>
-            
             <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-name" className="text-right">
-                  الاسم
-                </Label>
-                <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} className="col-span-3"/>
+               <div className="space-y-2">
+                <Label htmlFor="edit-name">الاسم</Label>
+                <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} disabled={isSubmitting}/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-category" className="text-right">
-                    الفئة
-                </Label>
-                <Input id="edit-category" placeholder="اكتب اسم فئة جديدة أو موجودة" value={category} onChange={(e) => setCategory(e.target.value)} className="col-span-3"/>
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">الفئة</Label>
+                <Input id="edit-category" placeholder="اكتب اسم فئة جديدة أو موجودة" value={category} onChange={(e) => setCategory(e.target.value)} disabled={isSubmitting}/>
               </div>
-               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="edit-description" className="text-right pt-2">
-                  الوصف
-                </Label>
-                <Textarea id="edit-description" value={description} onChange={(e) => setDescription(e.target.value)} className="col-span-3" rows={4}/>
+               <div className="space-y-2">
+                <Label htmlFor="edit-description">الوصف</Label>
+                <Textarea id="edit-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} disabled={isSubmitting}/>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-price" className="text-right">
-                  السعر (ج.م)
-                </Label>
-                <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="col-span-3"/>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-commission" className="text-right">
-                  العمولة (ج.م)
-                </Label>
-                <Input id="edit-commission" type="number" value={commission} onChange={(e) => setCommission(e.target.value)} className="col-span-3"/>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-stockQuantity" className="text-right">
-                  الكمية المتاحة
-                </Label>
-                <Input id="edit-stockQuantity" type="number" value={stockQuantity} onChange={(e) => setStockQuantity(e.target.value)} className="col-span-3"/>
-              </div>
-               <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="edit-imageUrls" className="text-right pt-2">
-                  روابط الصور
-                </Label>
-                <Textarea id="edit-imageUrls" placeholder="ضع كل رابط في سطر منفصل" value={imageUrls} onChange={(e) => setImageUrls(e.target.value)} className="col-span-3" rows={4}/>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-videoUrl" className="text-right">
-                    رابط الفيديو
-                </Label>
-                <Input id="edit-videoUrl" placeholder="https://example.com/video.mp4" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} className="col-span-3"/>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-purchaseUrl" className="text-right">
-                  رابط الشراء
-                </Label>
-                <Input id="edit-purchaseUrl" placeholder="https://supplier.com/product (اختياري)" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} className="col-span-3"/>
-              </div>
-               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-isAvailable" className="text-right">
-                  الحالة
-                </Label>
-                <div className="col-span-3 flex items-center gap-2">
-                    <Switch id="edit-isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable}/>
-                    <span>{isAvailable ? "نشط" : "غير نشط"}</span>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="edit-price">السعر (ج.م)</Label>
+                    <Input id="edit-price" type="number" value={price} onChange={(e) => setPrice(e.target.value)} disabled={isSubmitting}/>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="edit-commission">العمولة (ج.م)</Label>
+                    <Input id="edit-commission" type="number" value={commission} onChange={(e) => setCommission(e.target.value)} disabled={isSubmitting}/>
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-stockQuantity">الكمية المتاحة</Label>
+                <Input id="edit-stockQuantity" type="number" value={stockQuantity} onChange={(e) => setStockQuantity(e.target.value)} disabled={isSubmitting}/>
+              </div>
+
+               <div className="space-y-2">
+                    <Label>صور المنتج</Label>
+                    {imageUrls.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2">
+                            {imageUrls.map((url, i) => (
+                                <div key={i} className="relative aspect-square group">
+                                    <Image src={url} alt="preview" fill className="rounded-md object-cover"/>
+                                    <Button size="icon" variant="destructive" className="absolute -top-2 -right-2 h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveImage(url)} disabled={isSubmitting}>
+                                        <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                    <Button type="button" variant="outline" onClick={() => imageInputRef.current?.click()} disabled={isSubmitting}>
+                        <Upload className="me-2"/> إضافة صور جديدة
+                    </Button>
+                    <Input type="file" ref={imageInputRef} multiple accept="image/*" className="hidden" onChange={(e) => e.target.files && setNewImageFiles(Array.from(e.target.files))} />
+                    {newImageFiles.length > 0 && <p className="text-sm text-muted-foreground">تم اختيار {newImageFiles.length} صور جديدة للرفع.</p>}
+               </div>
+
+              <div className="space-y-2">
+                <Label>فيديو المنتج</Label>
+                {videoUrl && <p className="text-xs text-muted-foreground truncate">الفيديو الحالي: {videoUrl}</p>}
+                 <Button type="button" variant="outline" onClick={() => videoInputRef.current?.click()} disabled={isSubmitting} className="w-full">
+                    <Upload className="me-2"/> {videoUrl ? 'تغيير الفيديو' : 'رفع فيديو'}
+                </Button>
+                <Input type="file" ref={videoInputRef} accept="video/*" className="hidden" onChange={(e) => e.target.files && setNewVideoFile(e.target.files[0])}/>
+                {newVideoFile && <p className="text-sm text-muted-foreground">فيديو جديد مختار: {newVideoFile.name}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-purchaseUrl">رابط الشراء</Label>
+                <Input id="edit-purchaseUrl" placeholder="https://supplier.com/product (اختياري)" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} disabled={isSubmitting}/>
+              </div>
+               <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                 <div className="space-y-0.5">
+                    <Label htmlFor="edit-isAvailable">الحالة</Label>
+                    <p className="text-xs text-muted-foreground">إلغاء التفعيل سيخفي المنتج من المتجر.</p>
+                </div>
+                <Switch id="edit-isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable} disabled={isSubmitting}/>
+              </div>
+
+               {isSubmitting && (
+                <div className="space-y-2">
+                    <Label>جاري رفع الملفات الجديدة...</Label>
+                    <Progress value={uploadProgress} />
+                </div>
+              )}
             </div>
         </div>
         <DialogFooter>
