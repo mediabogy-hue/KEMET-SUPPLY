@@ -1,2 +1,2 @@
-// This file is now empty. The logic has been moved to the API route at /src/app/api/scrape/handler.ts
-// to prevent client-side bundling of server-only dependencies.
+// This file is intentionally left blank.
+// The scraping flow it contained has been removed due to instability.
