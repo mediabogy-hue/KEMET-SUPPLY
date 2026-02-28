@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from "react";
@@ -23,7 +22,6 @@ import { useSession } from "@/auth/SessionProvider";
 import { collection, doc, setDoc, serverTimestamp, query, orderBy, writeBatch } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
 import { Loader2, PlusCircle } from "lucide-react";
-import { scrapeProduct, type ScrapedProductData } from "@/ai/flows/scrape-product-flow";
 
 
 export function AddProductDialog() {
@@ -81,7 +79,17 @@ export function AddProductDialog() {
 
     setIsImporting(true);
     try {
-        const data = await scrapeProduct({ productUrl: importUrl, categoryNames });
+        const response = await fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productUrl: importUrl, categoryNames }),
+        });
+        
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch data from the server.');
+        }
         
         if (data.name) setName(data.name);
         if (data.description) setDescription(data.description);
@@ -100,7 +108,7 @@ export function AddProductDialog() {
         toast({
             variant: "destructive",
             title: "فشل استيراد البيانات",
-            description: error.message || "لم نتمكن من جلب البيانات من الرابط. قد تكون هناك مشكلة في الخادم أو الرابط غير صحيح.",
+            description: error.message || "لم نتمكن من جلب البيانات من الرابط.",
         });
     } finally {
         setIsImporting(false);
