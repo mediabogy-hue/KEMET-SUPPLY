@@ -53,8 +53,11 @@ service cloud.firestore {
     
     // Wallets
     match /wallets/{userId} {
-        allow get: if isOwner(userId) || isFinanceManager();
-        allow create, update: if false; // Managed by server-side logic
+        allow get: if isOwner(userId) || isFinanceManager() || isAdmin();
+        // create is done via server-side function on user registration.
+        // update is done by finance manager when processing withdrawals.
+        allow create: if false; 
+        allow update: if isFinanceManager() || isAdmin();
     }
     
     // Public Settings
@@ -97,12 +100,12 @@ service cloud.firestore {
 
     // Withdrawal requests
     match /adminWithdrawalRequests/{reqId} {
-        allow read, list, update, delete: if isFinanceManager();
+        allow read, list, update, delete: if isFinanceManager() || isAdmin();
         allow create: if false; // Only server can create
     }
     match /users/{userId}/withdrawalRequests/{reqId} {
         allow read, list: if isOwner(userId);
-        allow create, update, delete: if false; // Managed by server-side logic
+        allow create: if false; // Managed by server-side logic
     }
     
     // Merchant Inquiries can be created by anyone.

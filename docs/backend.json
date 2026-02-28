@@ -80,6 +80,35 @@
         "dropshipperId": { "type": "string" },
         "merchantId": { "type": "string" }
       }
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "type": "object",
+      "description": "Represents a user's financial wallet.",
+      "properties": {
+        "id": { "type": "string" },
+        "availableBalance": { "type": "number" },
+        "pendingBalance": { "type": "number" },
+        "pendingWithdrawals": { "type": "number" },
+        "totalWithdrawn": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "WithdrawalRequest": {
+      "title": "Withdrawal Request",
+      "type": "object",
+      "description": "Represents a user's request to withdraw funds.",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "method": { "type": "string", "enum": ["Vodafone Cash", "InstaPay", "Bank Transfer", "Telda"] },
+        "paymentIdentifier": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Completed", "Rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
     }
   },
   "auth": {
@@ -105,6 +134,24 @@
         "$ref": "#/entities/Order"
       },
       "description": "Stores order details."
+    },
+    "/wallets/{userId}": {
+      "schema": {
+        "$ref": "#/entities/Wallet"
+      },
+      "description": "Stores user wallet data."
+    },
+    "/users/{userId}/withdrawalRequests/{reqId}": {
+      "schema": {
+        "$ref": "#/entities/WithdrawalRequest"
+      },
+      "description": "Stores a user's withdrawal requests."
+    },
+    "/adminWithdrawalRequests/{reqId}": {
+      "schema": {
+        "$ref": "#/entities/WithdrawalRequest"
+      },
+      "description": "A collection for admins to manage all withdrawal requests."
     }
   }
 }
