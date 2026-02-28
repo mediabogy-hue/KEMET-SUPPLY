@@ -1,58 +1,103 @@
-import { notFound } from 'next/navigation';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useSearchParams } from 'next/navigation';
 import type { Product } from '@/lib/types';
 import Image from 'next/image';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { ProductOrderForm } from './_components/product-order-form';
 import { Separator } from '@/components/ui/separator';
-
-// NEW: Direct imports for a more stable server-side fetch
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebaseClient'; // Using the client SDK instance directly
+import { db } from '@/lib/firebaseClient';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type ProductPageProps = {
-    params: { productId: string };
-    searchParams: { [key: string]: string | string[] | undefined };
-};
+export default function PublicProductPage() {
+    const params = useParams();
+    const searchParams = useSearchParams();
+    
+    const productId = typeof params.productId === 'string' ? params.productId : '';
+    const refId = searchParams.get('ref');
 
-// This function now uses the client SDK on the server, which is allowed by the security rules.
-// This removes the dependency on the Admin SDK and the problematic environment variable for this public page.
-async function getProduct(productId: string): Promise<Product | null> {
-    try {
-        const productRef = doc(db, 'products', productId);
-        const docSnap = await getDoc(productRef);
+    const [product, setProduct] = useState<Product | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-        if (!docSnap.exists()) {
-            return null;
+    useEffect(() => {
+        if (!productId) {
+            setLoading(false);
+            setError("معرّف المنتج غير موجود.");
+            return;
         }
 
-        // Convert Firestore Timestamp to a serializable format for the client component
-        const data = docSnap.data();
-        const productData: Product = {
-            id: docSnap.id,
-            ...data,
-            // Ensure Timestamps are converted to strings if they exist
-            createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-            updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-        } as Product;
-        
-        return productData;
+        const fetchProduct = async () => {
+            try {
+                setLoading(true);
+                const productRef = doc(db, 'products', productId);
+                const docSnap = await getDoc(productRef);
 
-    } catch (error) {
-        console.error("Error fetching product directly on server:", error);
-        // Return null on any error to trigger a 'not found' page, which is safer for the user.
-        return null;
+                if (docSnap.exists() && docSnap.data().isAvailable) {
+                    const data = docSnap.data();
+                    // Firestore timestamps are not serializable, so we convert them to a serializable format.
+                    // The Product type allows for string or Timestamp, but we'll be consistent with serializable formats for client state.
+                    const productData: Product = {
+                        id: docSnap.id,
+                        ...data,
+                        createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+                        updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+                    } as Product;
+                    setProduct(productData);
+                } else {
+                    setError("عذراً، لم نتمكن من العثور على هذا المنتج. قد يكون الرابط غير صحيح أو تمت إزالة المنتج.");
+                }
+            } catch (err) {
+                console.error("Error fetching product on client:", err);
+                setError("حدث خطأ أثناء تحميل المنتج.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProduct();
+    }, [productId]);
+
+    if (loading) {
+        return (
+            <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+                <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
+                    <div className="space-y-4">
+                        <Skeleton className="aspect-square w-full rounded-lg" />
+                    </div>
+                    <div className="space-y-6">
+                        <Skeleton className="h-6 w-1/4" />
+                        <Skeleton className="h-10 w-3/4" />
+                        <Skeleton className="h-8 w-1/3" />
+                        <Separator />
+                        <Skeleton className="h-20 w-full" />
+                        <Skeleton className="h-48 w-full rounded-lg" />
+                    </div>
+                </div>
+            </div>
+        );
     }
-}
+    
+    if (error) {
+        return (
+             <div className="container mx-auto p-4 md:p-8 max-w-2xl text-center">
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-8">
+                     <h1 className="text-2xl font-bold text-destructive">حدث خطأ</h1>
+                     <p className="mt-4 text-destructive/80">{error}</p>
+                </div>
+             </div>
+        );
+    }
 
-
-export default async function PublicProductPage({ params, searchParams }: ProductPageProps) {
-    const { productId } = params;
-    const refId = typeof searchParams.ref === 'string' ? searchParams.ref : null;
-
-    const product = await getProduct(productId);
-
-    if (!product || !product.isAvailable) {
-        notFound();
+    if (!product) {
+        // This case should be covered by the error state, but as a fallback.
+        return (
+            <div className="container mx-auto p-4 md:p-8 max-w-2xl text-center">
+                <p>المنتج غير موجود.</p>
+            </div>
+        );
     }
     
     return (
