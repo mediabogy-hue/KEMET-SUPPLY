@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, where } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useSession } from '@/auth/SessionProvider';
@@ -16,8 +16,7 @@ interface CategoryBrowserProps {
 }
 
 export function CategoryBrowser({ selectedCategory, onSelectCategory }: CategoryBrowserProps) {
-    const firestore = useFirestore();
-    const { user } = useSession();
+    const { user, firestore } = useSession();
     
     // Fetch all categories and filter/sort on the client to avoid indexing issues.
     const categoriesQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, "productCategories") : null, [firestore, user]);

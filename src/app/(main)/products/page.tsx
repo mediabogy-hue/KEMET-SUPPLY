@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
 import { useSession } from '@/auth/SessionProvider';
 import { collection, query, orderBy, where } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
@@ -12,8 +12,7 @@ import { CategoryBrowser } from './_components/category-browser';
 import { ProductCard } from './_components/product-card';
 
 export default function ProductsPage() {
-    const firestore = useFirestore();
-    const { user } = useSession();
+    const { user, firestore } = useSession();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
