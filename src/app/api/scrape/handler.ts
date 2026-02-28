@@ -30,17 +30,23 @@ const productScraperFlow = ai.defineFlow(
     const result = await ai.generate({
       model: llm,
       output: { schema: ScrapedDataSchema, format: 'json' }, // Explicitly request JSON for better reliability
-      prompt: `
-        Analyze the following HTML content from an e-commerce product page. 
-        Your task is to extract the product's name, a detailed description, its price (as a number), a list of image URLs, and a suitable category.
-        Focus on the main content area and ignore irrelevant parts like navigation, footer, or ads.
-        Find the most prominent, high-resolution image URLs.
-        For the price, extract only the numerical value, ignoring currency symbols or text.
+      prompt: `You are an expert web scraping agent. Your task is to analyze the following HTML content from an e-commerce product page and extract key information.
 
-        HTML Content:
-        \`\`\`html
-        ${html}
-        \`\`\`
+First, look for structured data within \`<script type="application/ld+json">\` tags or other JSON objects embedded in the HTML. This is the most reliable source.
+
+If you cannot find structured data, then analyze the raw HTML tags.
+
+Extract the following information and return it as a valid JSON object:
+- "name": The product's full name or title.
+- "description": A detailed description. If multiple descriptions exist, combine them or choose the most informative one.
+- "price": The main price of the product, as a number. Ignore currency symbols, discounts, or price ranges. Find the final price.
+- "imageUrls": A list of absolute, full URLs for high-resolution product images (must start with http or https). Prioritize main product images over thumbnails.
+- "category": A suggested category for the product, like "Electronics" or "Apparel".
+
+HTML Content:
+\`\`\`html
+${html}
+\`\`\`
       `,
     });
 
