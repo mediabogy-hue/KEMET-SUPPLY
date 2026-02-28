@@ -12,7 +12,8 @@ export async function POST(req: Request) {
     // Dynamically import server-only modules ONLY at runtime inside the function.
     // This prevents the Next.js build process from crashing during static analysis.
     const { getAdminApp, getAdminDb } = await import("@/firebase/server-init");
-    const { FieldValue } = await import("firebase-admin/firestore");
+    const admin = await import("firebase-admin");
+    const FieldValue = admin.firestore.FieldValue;
 
     const authorization = req.headers.get("Authorization");
     if (!authorization?.startsWith("Bearer ")) {
