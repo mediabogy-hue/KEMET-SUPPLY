@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { useFirebase } from '@/firebase/provider';
+import { db as firestore } from '@/lib/firebaseClient';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -14,6 +14,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from 'next/link';
 import { cn, downloadAsset } from '@/lib/utils';
+import { useMemoFirebase } from '@/firebase';
 
 
 import type { Product, Payment, ReferredCustomer, Order } from '@/lib/types';
@@ -122,7 +123,6 @@ const orderSchema = z.object({
 type OrderFormData = z.infer<typeof orderSchema>;
 
 export default function PublicProductPage() {
-    const { firestore } = useFirebase();
     const params = useParams();
     const searchParams = useSearchParams();
     const { toast } = useToast();
@@ -142,7 +142,7 @@ export default function PublicProductPage() {
     const [isDownloadDialogOpen, setIsDownloadDialogOpen] = useState(false);
 
     useEffect(() => {
-        if (!firestore || !productId) {
+        if (!productId) {
             setProductLoading(false);
             return;
         }
@@ -167,10 +167,10 @@ export default function PublicProductPage() {
         };
 
         fetchProduct();
-    }, [firestore, productId]);
+    }, [productId]);
 
     useEffect(() => {
-        if (firestore && productId && dropshipperId && !hasTrackedClick.current) {
+        if (productId && dropshipperId && !hasTrackedClick.current) {
             hasTrackedClick.current = true;
             const clicksRef = collection(firestore, `products/${productId}/clicks`);
             addDoc(clicksRef, {
@@ -185,7 +185,7 @@ export default function PublicProductPage() {
                 }));
             });
         }
-    }, [firestore, productId, dropshipperId]);
+    }, [productId, dropshipperId]);
 
     const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
 
@@ -201,15 +201,15 @@ export default function PublicProductPage() {
         }
     }, [product]);
 
-    const relatedProductsQuery = useMemo(() => {
-        if (!firestore || !product?.category) return null;
+    const relatedProductsQuery = useMemoFirebase(() => {
+        if (!product?.category) return null;
         return query(
           collection(firestore, "products"),
           where("isAvailable", "==", true),
           where("category", "==", product.category),
           limit(4) // Fetch 4 to ensure we get 3 others if the current product is included
         );
-    }, [firestore, product]);
+    }, [product]);
 
     const { data: relatedProductsData, isLoading: relatedProductsLoading } = useCollection(relatedProductsQuery);
 
@@ -834,5 +834,3 @@ export default function PublicProductPage() {
         </div>
     );
 }
-
-    
