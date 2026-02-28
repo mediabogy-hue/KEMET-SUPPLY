@@ -1,3 +1,4 @@
+
 import type { Timestamp } from "firebase/firestore";
 
 // This is based on the `User` entity in `docs/backend.json`
@@ -51,8 +52,8 @@ export interface Product {
   imageUrls: string[];
   videoUrl?: string;
   purchaseUrl?: string;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
+  createdAt: Timestamp | string; // Allow string for serializability
+  updatedAt: Timestamp | string; // Allow string for serializability
   merchantId?: string | null;
   merchantName?: string | null;
 }
@@ -95,6 +96,7 @@ export interface Order {
   // Denormalized product info
   productId: string;
   productName: string;
+  productImageUrl?: string | null; // Added this field
   quantity: number;
   unitPrice: number;
   unitCommission: number;

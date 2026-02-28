@@ -84,6 +84,7 @@ export default function NewOrderPage() {
       customerNotes: data.notes || "",
       productId: selectedProduct.id,
       productName: selectedProduct.name,
+      productImageUrl: selectedProduct.imageUrls?.[0] || null,
       quantity: data.quantity,
       unitPrice: selectedProduct.price,
       unitCommission: selectedProduct.commission || 0,
