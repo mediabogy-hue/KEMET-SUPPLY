@@ -1,21 +1,17 @@
-
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { db as firestore } from '@/lib/firebaseClient';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { doc, collection, serverTimestamp, setDoc, query, where, limit, addDoc, getDocs, getDoc } from 'firebase/firestore';
+import { doc, collection, serverTimestamp, setDoc, addDoc, getDocs, getDoc } from 'firebase/firestore';
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from 'next/link';
 import { cn, downloadAsset } from '@/lib/utils';
-import { useMemoFirebase } from '@/firebase';
-
 
 import type { Product, Payment, ReferredCustomer, Order } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -28,13 +24,6 @@ import { ToastAction } from "@/components/ui/toast";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Logo } from '@/components/logo';
 import { Truck, CreditCard, ShieldCheck, Undo2, Landmark, PlayCircle, Copy, Loader2, Download } from 'lucide-react';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
 import {
   Accordion,
   AccordionContent,
@@ -200,24 +189,6 @@ export default function PublicProductPage() {
             }
         }
     }, [product]);
-
-    const relatedProductsQuery = useMemoFirebase(() => {
-        if (!product?.category) return null;
-        return query(
-          collection(firestore, "products"),
-          where("isAvailable", "==", true),
-          where("category", "==", product.category),
-          limit(4) // Fetch 4 to ensure we get 3 others if the current product is included
-        );
-    }, [product]);
-
-    const { data: relatedProductsData, isLoading: relatedProductsLoading } = useCollection(relatedProductsQuery);
-
-    const relatedProducts = useMemo(() => {
-        if (!relatedProductsData || !product) return [];
-        // Filter out the current product and take the first 3
-        return relatedProductsData.filter(p => p.id !== product.id).slice(0, 3);
-    }, [relatedProductsData, product]);
 
     const { register, handleSubmit, control, watch, formState: { errors, isSubmitting } } = useForm<OrderFormData>({
         resolver: zodResolver(orderSchema),
@@ -764,42 +735,6 @@ export default function PublicProductPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-            {relatedProducts && relatedProducts.length > 0 && (
-                <div className="mt-16">
-                    <h2 className="text-3xl font-bold mb-8 text-center">منتجات مشابهة قد تعجبك</h2>
-                    <Carousel
-                        opts={{ align: "start", loop: true, direction: "rtl" }}
-                        className="w-full max-w-6xl mx-auto"
-                    >
-                        <CarouselContent className="-mr-4">
-                            {relatedProducts.map((p) => (
-                                <CarouselItem key={p.id} className="pr-4 basis-full sm:basis-1/2 md:basis-1/3">
-                                    <Card className="h-full flex flex-col overflow-hidden group">
-                                        <Link href={`/product/${p.id}${dropshipperId ? `?ref=${dropshipperId}` : ''}`} className="block">
-                                            <CardContent className="p-0 aspect-square bg-muted/30">
-                                                <Image
-                                                    src={p.imageUrls?.[0] || `https://picsum.photos/seed/${p.id}/600/600`}
-                                                    alt={p.name}
-                                                    width={600}
-                                                    height={600}
-                                                    className="w-full h-full object-contain transition-transform group-hover:scale-105"
-                                                />
-                                            </CardContent>
-                                        </Link>
-                                        <div className="p-4 border-t flex-grow flex flex-col justify-between">
-                                            <h3 className="font-semibold truncate">{p.name}</h3>
-                                            <p className="text-lg font-bold text-primary mt-1">{p.price.toFixed(2)} ج.م</p>
-                                        </div>
-                                    </Card>
-                                </CarouselItem>
-                            ))}
-                        </CarouselContent>
-                        <CarouselPrevious className="start-0 -translate-x-1/2"/>
-                        <CarouselNext className="end-0 translate-x-1/2"/>
-                    </Carousel>
-                </div>
-            )}
 
             <div className="mt-16 max-w-4xl mx-auto">
                 <Accordion type="single" collapsible className="w-full">
