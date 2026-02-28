@@ -47,9 +47,6 @@ export function AddProductDialog() {
   // Control state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [importUrl, setImportUrl] = useState("");
-  const [isImporting, setIsImporting] = useState(false);
-
 
   const resetForm = () => {
       setName("");
@@ -62,59 +59,7 @@ export function AddProductDialog() {
       setVideoUrl("");
       setPurchaseUrl("");
       setIsAvailable(true);
-      setImportUrl("");
   };
-
-  const handleImportFromUrl = async () => {
-    if (!importUrl) {
-        toast({ variant: 'destructive', title: 'الرجاء إدخال رابط' });
-        return;
-    }
-    
-    const categoryNames = categories?.map(c => c.name) || [];
-    if (categoryNames.length === 0) {
-        toast({ variant: 'destructive', title: 'لا توجد فئات', description: 'الرجاء إضافة فئات أولاً من صفحة إدارة الفئات.' });
-        return;
-    }
-
-    setIsImporting(true);
-    try {
-        const response = await fetch('/api/scrape', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ productUrl: importUrl, categoryNames }),
-        });
-        
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch data from the server.');
-        }
-        
-        if (data.name) setName(data.name);
-        if (data.description) setDescription(data.description);
-        if (data.price) setPrice(data.price.toString());
-        if (data.imageUrls && data.imageUrls.length > 0) {
-            setImageUrls(data.imageUrls.join('\n'));
-        }
-        if (data.category) setCategory(data.category);
-        
-        setPurchaseUrl(importUrl);
-
-        toast({ title: 'تم استيراد بيانات المنتج بنجاح!' });
-
-    } catch (error: any) {
-        console.error("Import error:", error);
-        toast({
-            variant: "destructive",
-            title: "فشل استيراد البيانات",
-            description: error.message || "لم نتمكن من جلب البيانات من الرابط.",
-        });
-    } finally {
-        setIsImporting(false);
-    }
-  };
-
 
   const handleSaveProduct = async () => {
     const priceNumber = parseFloat(price);
@@ -220,7 +165,7 @@ export function AddProductDialog() {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
-        if (isSubmitting || isImporting) return;
+        if (isSubmitting) return;
         setIsOpen(open);
         if (!open) resetForm();
     }}>
@@ -234,29 +179,11 @@ export function AddProductDialog() {
         <DialogHeader>
           <DialogTitle>إضافة منتج جديد</DialogTitle>
           <DialogDescription>
-            أدخل تفاصيل المنتج الجديد أو استوردها من رابط.
+            أدخل تفاصيل المنتج الجديد.
           </DialogDescription>
         </DialogHeader>
         
         <div className="max-h-[65vh] overflow-y-auto px-1 space-y-4">
-            <div className="border-b pb-4">
-                <Label htmlFor="import-url" className="mb-2 block">استيراد من رابط (تجريبي)</Label>
-                <div className="flex gap-2">
-                    <Input 
-                        id="import-url"
-                        placeholder="https://www.noon.com/..."
-                        value={importUrl}
-                        onChange={(e) => setImportUrl(e.target.value)}
-                        disabled={isImporting || isSubmitting}
-                    />
-                    <Button onClick={handleImportFromUrl} disabled={isImporting || categoriesLoading || isSubmitting}>
-                        {isImporting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'جلب البيانات'}
-                    </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                    لصق رابط المنتج من (جوميا، نون، أمازون) لجلب البيانات تلقائياً.
-                </p>
-            </div>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">
@@ -326,9 +253,9 @@ export function AddProductDialog() {
 
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline" disabled={isSubmitting || isImporting}>إلغاء</Button>
+            <Button variant="outline" disabled={isSubmitting}>إلغاء</Button>
           </DialogClose>
-          <Button type="button" onClick={handleSaveProduct} disabled={isSubmitting || isImporting}>
+          <Button type="button" onClick={handleSaveProduct} disabled={isSubmitting}>
             {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
             {isSubmitting ? 'جاري الحفظ...' : 'حفظ المنتج'}
           </Button>
