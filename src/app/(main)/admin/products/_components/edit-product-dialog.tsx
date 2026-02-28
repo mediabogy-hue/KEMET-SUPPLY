@@ -106,7 +106,7 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
       setDescription(data.description || description);
       setPrice(data.price?.toString() || price);
       setCategory(data.category || category);
-      setNewImageUrlLinksInput(prev => [prev, ...data.imageUrls].filter(Boolean).join('\n'));
+      setNewImageUrlLinksInput(prev => [prev, ...(data.imageUrls || [])].filter(Boolean).join('\n'));
 
       toast({ title: 'تم جلب البيانات بنجاح!' });
 
