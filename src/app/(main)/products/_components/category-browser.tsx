@@ -7,6 +7,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, where } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useSession } from '@/auth/SessionProvider';
+import { useMemo } from 'react';
 
 
 interface CategoryBrowserProps {
@@ -17,8 +18,17 @@ interface CategoryBrowserProps {
 export function CategoryBrowser({ selectedCategory, onSelectCategory }: CategoryBrowserProps) {
     const firestore = useFirestore();
     const { user } = useSession();
-    const categoriesQuery = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "productCategories"), where("isAvailable", "==", true), orderBy("name", "asc")) : null, [firestore, user]);
+    
+    // Fetch all categories and filter/sort on the client to avoid indexing issues.
+    const categoriesQuery = useMemoFirebase(() => (firestore && user) ? collection(firestore, "productCategories") : null, [firestore, user]);
     const { data: categories, isLoading } = useCollection<ProductCategory>(categoriesQuery);
+
+    const availableCategories = useMemo(() => {
+        if (!categories) return [];
+        return categories
+            .filter(cat => cat.isAvailable)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [categories]);
 
     return (
         <div className="py-8">
@@ -45,7 +55,7 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
                         <Skeleton className="h-4 w-20" />
                     </div>
                 ))}
-                {!isLoading && categories?.map((category) => (
+                {!isLoading && availableCategories?.map((category) => (
                      <div key={category.id} className="flex flex-col items-center gap-2 group">
                         <button
                              onClick={() => onSelectCategory(category.name)}

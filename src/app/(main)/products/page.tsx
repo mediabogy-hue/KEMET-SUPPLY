@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -18,26 +17,30 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
+    // Fetch all products and filter/sort on the client to avoid indexing issues.
     const productsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
-
-        let q = query(collection(firestore, 'products'), where('isAvailable', '==', true), orderBy('name', 'asc'));
-
-        if (selectedCategory !== 'all') {
-            q = query(q, where('category', '==', selectedCategory));
-        }
-
-        return q;
-    }, [firestore, user, selectedCategory]);
+        return collection(firestore, 'products');
+    }, [firestore, user]);
 
     const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
 
-    const filteredProducts = useMemo(() => {
+    const filteredAndSortedProducts = useMemo(() => {
         if (!products) return [];
-        if (!searchTerm) return products;
-        const lowerCaseSearch = searchTerm.toLowerCase();
-        return products.filter(p => p.name.toLowerCase().includes(lowerCaseSearch));
-    }, [products, searchTerm]);
+        
+        let processedProducts = products
+            // 1. Filter for available products
+            .filter(p => p.isAvailable)
+            // 2. Filter by selected category
+            .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
+            // 3. Filter by search term
+            .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+            
+        // 4. Sort by creation date (newest first)
+        processedProducts.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+
+        return processedProducts;
+    }, [products, searchTerm, selectedCategory]);
 
     return (
         <div className="space-y-6">
@@ -59,8 +62,8 @@ export default function ProductsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {productsLoading ? (
                     Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-96 rounded-lg" />)
-                ) : filteredProducts.length > 0 ? (
-                    filteredProducts.map(product => (
+                ) : filteredAndSortedProducts.length > 0 ? (
+                    filteredAndSortedProducts.map(product => (
                         <ProductCard key={product.id} product={product} />
                     ))
                 ) : (
