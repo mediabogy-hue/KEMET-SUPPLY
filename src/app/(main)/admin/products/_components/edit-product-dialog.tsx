@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -37,7 +38,6 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
   const { toast } = useToast();
 
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -49,15 +49,15 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
   const [isAvailable, setIsAvailable] = useState(true);
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   const [newImageFiles, setNewImageFiles] = useState<File[]>([]);
-  const [newVideoFile, setNewVideoFile] = useState<File | null>(null);
+  const [newImageUrlLinksInput, setNewImageUrlLinksInput] = useState("");
   
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setNewImageFiles([]);
-    setNewVideoFile(null);
+    setNewImageUrlLinksInput("");
     setIsSubmitting(false);
   }
 
@@ -70,7 +70,7 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
         setCommission(product.commission?.toString() || "");
         setStockQuantity(product.stockQuantity?.toString() || "");
         setImageUrls(product.imageUrls || []);
-        setVideoUrl(product.videoUrl || null);
+        setVideoUrlInput(product.videoUrl || "");
         setPurchaseUrl(product.purchaseUrl || "");
         setIsAvailable(product.isAvailable);
     } else if (!isOpen) {
@@ -97,7 +97,8 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
     (async () => {
         try {
             let finalImageUrls = [...imageUrls];
-            let finalVideoUrl = videoUrl;
+            const parsedNewUrls = newImageUrlLinksInput.split('\n').map(url => url.trim()).filter(Boolean);
+            finalImageUrls.push(...parsedNewUrls);
 
             if (newImageFiles.length > 0) {
                 const imageUploadPromises = newImageFiles.map(async (file) => {
@@ -110,11 +111,7 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
                 finalImageUrls.push(...newUrls);
             }
 
-            if (newVideoFile) {
-                 const fileRef = storageRef(storage, `products/${product.id}/${Date.now()}-${newVideoFile.name}`);
-                 const snapshot = await uploadBytes(fileRef, newVideoFile);
-                 finalVideoUrl = await getDownloadURL(snapshot.ref);
-            }
+            const finalVideoUrl = videoUrlInput.trim() || null;
 
             const productDocRef = doc(firestore, "products", product.id);
             const updatedData: any = {
@@ -191,8 +188,8 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
               </div>
 
                <div className="space-y-2">
-                    <Label>صور المنتج</Label>
-                    {imageUrls.length > 0 && (
+                    <Label>صور المنتج الحالية</Label>
+                    {imageUrls.length > 0 ? (
                         <div className="grid grid-cols-3 gap-2">
                             {imageUrls.map((url, i) => (
                                 <div key={i} className="relative aspect-square group">
@@ -203,22 +200,28 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
                                 </div>
                             ))}
                         </div>
-                    )}
-                    <Button type="button" variant="outline" onClick={() => imageInputRef.current?.click()}>
-                        <Upload className="me-2"/> إضافة صور جديدة
-                    </Button>
-                    <Input type="file" ref={imageInputRef} multiple accept="image/*" className="hidden" onChange={(e) => e.target.files && setNewImageFiles(Array.from(e.target.files))} />
+                    ) : <p className="text-xs text-muted-foreground">لا توجد صور حالية.</p>}
+                </div>
+                
+                <div className="space-y-2">
+                    <Label>إضافة صور جديدة</Label>
+                    <div className="space-y-2">
+                        <Button type="button" variant="outline" onClick={() => imageInputRef.current?.click()}>
+                            <Upload className="me-2"/> رفع صور من الجهاز ({newImageFiles.length})
+                        </Button>
+                        <Input type="file" ref={imageInputRef} multiple accept="image/*" className="hidden" onChange={(e) => e.target.files && setNewImageFiles(Array.from(e.target.files))} />
+                        
+                        <div className="space-y-1">
+                          <Label htmlFor="new-image-urls" className="text-xs text-muted-foreground">أو إضافة روابط صور جديدة (رابط في كل سطر)</Label>
+                          <Textarea id="new-image-urls" placeholder="https://example.com/image3.jpg" value={newImageUrlLinksInput} onChange={(e) => setNewImageUrlLinksInput(e.target.value)} rows={2} />
+                        </div>
+                    </div>
                     {newImageFiles.length > 0 && <p className="text-sm text-muted-foreground">تم اختيار {newImageFiles.length} صور جديدة للرفع.</p>}
                </div>
 
               <div className="space-y-2">
-                <Label>فيديو المنتج</Label>
-                {videoUrl && <p className="text-xs text-muted-foreground truncate">الفيديو الحالي: {videoUrl}</p>}
-                 <Button type="button" variant="outline" onClick={() => videoInputRef.current?.click()} className="w-full">
-                    <Upload className="me-2"/> {videoUrl ? 'تغيير الفيديو' : 'رفع فيديو'}
-                </Button>
-                <Input type="file" ref={videoInputRef} accept="video/*" className="hidden" onChange={(e) => e.target.files && setNewVideoFile(e.target.files[0])}/>
-                {newVideoFile && <p className="text-sm text-muted-foreground">فيديو جديد مختار: {newVideoFile.name}</p>}
+                <Label htmlFor="edit-video-url">رابط الفيديو (اختياري)</Label>
+                <Input id="edit-video-url" value={videoUrlInput} onChange={(e) => setVideoUrlInput(e.target.value)} placeholder="https://youtube.com/watch?v=..."/>
               </div>
 
               <div className="space-y-2">

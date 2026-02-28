@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef } from "react";
@@ -21,7 +22,7 @@ import { useFirestore, useCollection, useMemoFirebase, useStorage } from "@/fire
 import { useSession } from "@/auth/SessionProvider";
 import { collection, doc, setDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
-import { PlusCircle, Upload, Video, Image as ImageIcon } from "lucide-react";
+import { PlusCircle, Upload } from "lucide-react";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "@/lib/utils";
 import Image from "next/image";
@@ -36,7 +37,6 @@ export function AddProductDialog() {
   const { data: categories, isLoading: categoriesLoading } = useCollection<ProductCategory>(categoriesQuery);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -48,7 +48,8 @@ export function AddProductDialog() {
   const [isAvailable, setIsAvailable] = useState(true);
   
   const [imageFiles, setImageFiles] = useState<File[]>([]);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [imageUrlLinksInput, setImageUrlLinksInput] = useState("");
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -63,7 +64,8 @@ export function AddProductDialog() {
       setPurchaseUrl("");
       setIsAvailable(true);
       setImageFiles([]);
-      setVideoFile(null);
+      setImageUrlLinksInput("");
+      setVideoUrlInput("");
       setIsSubmitting(false);
   };
 
@@ -78,8 +80,9 @@ export function AddProductDialog() {
       toast({ variant: "destructive", title: "خطأ", description: "الرجاء ملء جميع الحقول المطلوبة بقيم صحيحة." });
       return;
     }
-     if (imageFiles.length === 0) {
-      toast({ variant: "destructive", title: "خطأ", description: "يجب رفع صورة واحدة على الأقل للمنتج." });
+    const parsedImageUrls = imageUrlLinksInput.split('\n').map(url => url.trim()).filter(Boolean);
+    if (imageFiles.length === 0 && parsedImageUrls.length === 0) {
+      toast({ variant: "destructive", title: "خطأ", description: "يجب رفع صورة واحدة على الأقل أو إضافة رابط صورة." });
       return;
     }
     
@@ -94,7 +97,7 @@ export function AddProductDialog() {
     const { update: updateToast } = toast({
       title: "جاري إضافة المنتج...",
       description: "سيتم رفع الملفات وحفظ البيانات في الخلفية.",
-      duration: 999999, // Sticky toast
+      duration: 999999,
     });
 
     (async () => {
@@ -109,19 +112,14 @@ export function AddProductDialog() {
         });
         
         const uploadedImageUrls = await Promise.all(imageUploadPromises);
-        
-        let uploadedVideoUrl: string | undefined = undefined;
-        if (videoFile) {
-             const fileRef = storageRef(storage, `products/${productId}/${Date.now()}-${videoFile.name}`);
-             const snapshot = await uploadBytes(fileRef, videoFile);
-             uploadedVideoUrl = await getDownloadURL(snapshot.ref);
-        }
+        const finalImageUrls = [...uploadedImageUrls, ...parsedImageUrls];
+        const finalVideoUrl = videoUrlInput.trim() || undefined;
         
         const productDocRef = doc(firestore, "products", productId);
         const newProductData: Omit<Product, 'createdAt' | 'updatedAt'> = {
           id: productId, name, category, description,
           price: priceNumber, commission: commissionNumber, stockQuantity: quantityNumber,
-          isAvailable, imageUrls: uploadedImageUrls, videoUrl: uploadedVideoUrl, purchaseUrl,
+          isAvailable, imageUrls: finalImageUrls, videoUrl: finalVideoUrl, purchaseUrl,
           merchantId: profile?.role === 'Merchant' ? user.uid : null,
           merchantName: profile?.role === 'Merchant' ? `${profile.firstName} ${profile.lastName}`.trim() : 'Kemet Supply',
         };
@@ -198,16 +196,20 @@ export function AddProductDialog() {
 
                <div className="space-y-2">
                     <Label>ملفات المنتج</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                        <Button type="button" variant="outline" onClick={() => imageInputRef.current?.click()}>
-                            <Upload className="me-2"/> رفع صور ({imageFiles.length})
-                        </Button>
-                         <Button type="button" variant="outline" onClick={() => videoInputRef.current?.click()}>
-                            <Video className="me-2"/> {videoFile ? "تغيير الفيديو" : "رفع فيديو"}
-                        </Button>
-                    </div>
+                    <Button type="button" variant="outline" onClick={() => imageInputRef.current?.click()}>
+                        <Upload className="me-2"/> رفع صور من الجهاز ({imageFiles.length})
+                    </Button>
                     <Input type="file" ref={imageInputRef} multiple accept="image/*" className="hidden" onChange={(e) => e.target.files && setImageFiles(Array.from(e.target.files))} />
-                    <Input type="file" ref={videoInputRef} accept="video/*" className="hidden" onChange={(e) => e.target.files && setVideoFile(e.target.files[0])}/>
+                    
+                    <div className="space-y-1 pt-2">
+                        <Label htmlFor="image-urls">أو إضافة روابط صور (رابط في كل سطر)</Label>
+                        <Textarea id="image-urls" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.png" value={imageUrlLinksInput} onChange={(e) => setImageUrlLinksInput(e.target.value)} rows={3} />
+                    </div>
+
+                    <div className="space-y-1 pt-2">
+                        <Label htmlFor="video-url">رابط فيديو (اختياري)</Label>
+                        <Input id="video-url" placeholder="https://youtube.com/watch?v=..." value={videoUrlInput} onChange={(e) => setVideoUrlInput(e.target.value)} />
+                    </div>
                     
                     {imageFiles.length > 0 && (
                         <div className="grid grid-cols-3 gap-2 mt-2">
@@ -218,7 +220,6 @@ export function AddProductDialog() {
                             ))}
                         </div>
                     )}
-                    {videoFile && <p className="text-sm text-muted-foreground mt-1">الفيديو المختار: {videoFile.name}</p>}
                </div>
               
               <div className="space-y-2">
