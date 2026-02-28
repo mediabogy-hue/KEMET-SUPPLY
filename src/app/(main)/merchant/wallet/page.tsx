@@ -8,14 +8,14 @@ import type { Wallet, WithdrawalRequest } from "@/lib/types";
 
 import { WalletStats } from "@/components/shared/wallet-stats";
 import { WithdrawalHistoryTable } from "@/components/shared/withdrawal-history-table";
-import { WithdrawalDialog } from "./_components/withdrawal-dialog";
+import { WithdrawalDialog } from "@/app/(main)/reports/_components/withdrawal-dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 
-export default function ReportsPage() {
+export default function MerchantWalletPage() {
     const { user, profile, firestore, isLoading: sessionLoading } = useSession();
 
     const walletRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'wallets', user.uid) : null, [firestore, user]);
@@ -31,7 +31,7 @@ export default function ReportsPage() {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">التقارير المالية</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">المحفظة المالية</h1>
                     <p className="text-muted-foreground">
                         هنا يمكنك متابعة أرباحك وطلب سحب مستحقاتك.
                     </p>

@@ -10,7 +10,7 @@ const PERMISSIONS: Record<UserRole, string[]> = {
   OrdersManager: ['/admin/orders', '/admin/shipping', '/admin/dashboard'],
   FinanceManager: ['/admin/withdrawals', '/admin/payments', '/admin/dashboard'],
   Dropshipper: ['/dashboard', '/products', '/orders', '/reports', '/profile', '/policy'],
-  Merchant: ['/merchant', '/profile', '/products', '/orders', '/reports', '/policy'],
+  Merchant: ['/merchant', '/profile', '/policy'],
 };
 
 // Common paths accessible by any authenticated user

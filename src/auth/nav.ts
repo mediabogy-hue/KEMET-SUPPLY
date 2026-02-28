@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  LayoutDashboard, Box, ShoppingCart, Users, Settings, FileText, BarChart, ShieldCheck, DollarSign, Truck, Package, Banknote, Store, Handshake
+  LayoutDashboard, Box, ShoppingCart, Users, Settings, FileText, BarChart, ShieldCheck, DollarSign, Truck, Package, Banknote, Store, Handshake, Wallet
 } from "lucide-react";
 import type { UserRole } from "./permissions";
 
@@ -73,6 +73,12 @@ export const navLinks: NavLink[] = [
         href: "/merchant/inventory",
         label: "المخزون",
         icon: React.createElement(Package),
+        roles: ['Merchant'],
+    },
+    {
+        href: "/merchant/wallet",
+        label: "المحفظة المالية",
+        icon: React.createElement(Wallet),
         roles: ['Merchant'],
     },
 
