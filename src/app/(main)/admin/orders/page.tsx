@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, writeBatch, increment } from 'firebase/firestore';
+import { collection, query, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, writeBatch, increment, setDoc } from 'firebase/firestore';
 import type { Order, Shipment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,20 +66,20 @@ export default function AdminOrdersPage() {
                 
                 // 2. Update dropshipper's wallet
                 const dropshipperWalletRef = doc(firestore, 'wallets', order.dropshipperId);
-                batch.update(dropshipperWalletRef, {
+                batch.set(dropshipperWalletRef, {
                     availableBalance: increment(order.totalCommission),
                     updatedAt: serverTimestamp()
-                });
+                }, { merge: true });
 
                 // 3. Update merchant's wallet (ONLY if merchant exists)
                 if (order.merchantId) {
                     const platformFee = order.platformFee || 0;
                     const merchantProfit = order.totalAmount - order.totalCommission - platformFee;
                     const merchantWalletRef = doc(firestore, 'wallets', order.merchantId);
-                    batch.update(merchantWalletRef, {
+                    batch.set(merchantWalletRef, {
                         availableBalance: increment(merchantProfit),
                         updatedAt: serverTimestamp()
-                    });
+                    }, { merge: true });
                 }
                 
                 await batch.commit();
