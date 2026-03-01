@@ -44,6 +44,7 @@ export default function SettlementsPage() {
             await runTransaction(firestore, async (transaction) => {
                 const orderRef = doc(firestore, 'orders', order.id);
                 const freshOrderDoc = await transaction.get(orderRef);
+
                 if (!freshOrderDoc.exists() || freshOrderDoc.data().isSettled === true) {
                     throw new Error(`تمت تسوية الطلب #${order.id.substring(0,5)} بالفعل.`);
                 }
@@ -51,20 +52,33 @@ export default function SettlementsPage() {
                 // 1. Mark order as settled
                 transaction.update(orderRef, { isSettled: true, settledAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
-                // 2. Settle dropshipper commission
-                const dropshipperId = order.dropshipperId;
                 const dropshipperCommission = Number(order.totalCommission || 0);
+
+                // 2. Settle dropshipper commission (robustly)
+                const dropshipperId = order.dropshipperId;
                 if (dropshipperId && dropshipperCommission > 0) {
                     const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
                     const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
-                    const currentBalance = Number(dropshipperWalletDoc.data()?.availableBalance || 0);
-                    transaction.update(dropshipperWalletRef, { 
-                        availableBalance: currentBalance + dropshipperCommission,
-                        updatedAt: serverTimestamp() 
-                    });
+
+                    if (dropshipperWalletDoc.exists()) {
+                        transaction.update(dropshipperWalletRef, { 
+                            availableBalance: increment(dropshipperCommission),
+                            updatedAt: serverTimestamp() 
+                        });
+                    } else {
+                        // Create wallet if it doesn't exist
+                        transaction.set(dropshipperWalletRef, {
+                            id: dropshipperId,
+                            availableBalance: dropshipperCommission,
+                            pendingBalance: 0,
+                            pendingWithdrawals: 0,
+                            totalWithdrawn: 0,
+                            updatedAt: serverTimestamp(),
+                        });
+                    }
                 }
 
-                // 3. Settle merchant profit
+                // 3. Settle merchant profit (robustly)
                 const merchantId = order.merchantId;
                 if (merchantId) {
                     const orderTotalAmount = Number(order.totalAmount || 0);
@@ -74,14 +88,14 @@ export default function SettlementsPage() {
                     if (merchantProfit > 0) {
                         const merchantWalletRef = doc(firestore, 'wallets', merchantId);
                         const merchantWalletDoc = await transaction.get(merchantWalletRef);
-                        const currentMerchantBalance = Number(merchantWalletDoc.data()?.availableBalance || 0);
                         
                         if (merchantWalletDoc.exists()) {
                              transaction.update(merchantWalletRef, { 
-                                availableBalance: currentMerchantBalance + merchantProfit,
+                                availableBalance: increment(merchantProfit),
                                 updatedAt: serverTimestamp() 
                             });
                         } else {
+                            // Create wallet if it doesn't exist
                             transaction.set(merchantWalletRef, {
                                 id: merchantId,
                                 availableBalance: merchantProfit,
