@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -21,7 +22,8 @@ export default function MerchantOrdersPage() {
     const ordersQuery = useMemoFirebase(
         () => (firestore && user) ? query(
             collection(firestore, "orders"),
-            where("merchantId", "==", user.uid)
+            where("merchantId", "==", user.uid),
+            orderBy("createdAt", "desc")
         ) : null,
         [firestore, user]
     );

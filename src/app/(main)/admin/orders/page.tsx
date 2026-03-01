@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -67,10 +68,6 @@ export default function AdminOrdersPage() {
                 toast({ variant: 'destructive', title: 'الطلب تم توصيله بالفعل', description: 'لا يمكن توصيل الطلب مرتين.' });
                 return;
             }
-            if (!order.merchantId) {
-                toast({ variant: 'destructive', title: 'خطأ في بيانات الطلب', description: 'لا يمكن إتمام التسوية المالية، التاجر غير محدد.' });
-                return;
-            }
 
             try {
                 const batch = writeBatch(firestore);
@@ -85,14 +82,16 @@ export default function AdminOrdersPage() {
                     updatedAt: serverTimestamp()
                 });
 
-                // 3. Update merchant's wallet
-                const merchantProfit = order.totalAmount - order.totalCommission - order.platformFee;
-                const merchantWalletRef = doc(firestore, 'wallets', order.merchantId);
-                batch.update(merchantWalletRef, {
-                    availableBalance: increment(merchantProfit),
-                    updatedAt: serverTimestamp()
-                });
-
+                // 3. Update merchant's wallet (ONLY if merchant exists)
+                if (order.merchantId) {
+                    const merchantProfit = order.totalAmount - order.totalCommission - order.platformFee;
+                    const merchantWalletRef = doc(firestore, 'wallets', order.merchantId);
+                    batch.update(merchantWalletRef, {
+                        availableBalance: increment(merchantProfit),
+                        updatedAt: serverTimestamp()
+                    });
+                }
+                
                 await batch.commit();
                 
                 // Update local state
@@ -100,7 +99,7 @@ export default function AdminOrdersPage() {
                 
                 toast({
                     title: '🎉 تم تأكيد التوصيل والتسوية المالية!',
-                    description: `تم إضافة الأرباح إلى محافظ المسوق والتاجر.`,
+                    description: `تم إضافة الأرباح إلى محافظ المسوق ${order.merchantId ? 'والتاجر' : ''}.`,
                 });
 
             } catch (e) {
