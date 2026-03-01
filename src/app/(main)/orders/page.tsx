@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -13,7 +12,6 @@ import { DataTable } from '@/app/(main)/admin/orders/_components/data-table';
 import { ShipmentDetailsDrawer } from '@/components/shared/shipment-details-drawer';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { PaymentDialog } from './_components/payment-dialog';
 import { getDropshipperOrderColumns } from './_components/columns';
 
 
@@ -25,7 +23,6 @@ export default function MyOrdersPage() {
 
     const [orderToViewShipment, setOrderToViewShipment] = useState<Order | null>(null);
     const [shipmentDetails, setShipmentDetails] = useState<Shipment | null>(null);
-    const [orderForPayment, setOrderForPayment] = useState<Order | null>(null);
 
     const ordersQuery = useMemoFirebase(
         () => (firestore && user) ? query(
@@ -57,12 +54,11 @@ export default function MyOrdersPage() {
     };
     
     const handleReorder = (product: Partial<Product>) => {
-        // This is a simplified re-order. A better implementation might pre-fill the form.
         router.push(`/orders/new?productId=${product.id}`);
     };
 
     const columns = useMemo(
-        () => getDropshipperOrderColumns(handleViewShipment, (order) => setOrderForPayment(order), handleReorder),
+        () => getDropshipperOrderColumns(handleViewShipment, handleReorder),
         []
     );
 
@@ -102,13 +98,6 @@ export default function MyOrdersPage() {
                         setShipmentDetails(null);
                     }
                 }}
-            />
-            
-            <PaymentDialog
-                order={orderForPayment}
-                isOpen={!!orderForPayment}
-                onOpenChange={(isOpen) => !isOpen && setOrderForPayment(null)}
-                onPaymentSuccess={() => { /* Realtime listener will handle update */ }}
             />
         </div>
     );

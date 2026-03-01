@@ -1,12 +1,11 @@
-
 'use client';
 import { useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc, collection, serverTimestamp, getDoc } from 'firebase/firestore';
-import type { Product, UserProfile } from '@/lib/types';
+import { doc, setDoc, collection, serverTimestamp, getDoc, writeBatch } from 'firebase/firestore';
+import type { Product, UserProfile, Payment } from '@/lib/types';
 import { governorates } from '@/lib/governorates';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, PartyPopper } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 
 const orderSchema = z.object({
     customerName: z.string().min(3, "الرجاء إدخال اسم ثلاثي على الأقل"),
@@ -22,7 +22,21 @@ const orderSchema = z.object({
     customerAddress: z.string().min(10, "الرجاء إدخال عنوان مفصل"),
     customerCity: z.string().min(1, "الرجاء اختيار المحافظة"),
     quantity: z.number().min(1).max(10),
+    customerPaymentMethod: z.enum(["Cash on Delivery", "Vodafone Cash", "InstaPay"], {
+        required_error: "الرجاء اختيار طريقة الدفع",
+    }),
+    paymentSenderNumber: z.string().optional(),
+    paymentTransactionId: z.string().optional(),
+}).refine((data) => {
+    if (data.customerPaymentMethod !== 'Cash on Delivery') {
+        return !!data.paymentSenderNumber && !!data.paymentTransactionId;
+    }
+    return true;
+}, {
+    message: "بيانات إثبات الدفع مطلوبة لهذه الطريقة",
+    path: ["paymentTransactionId"],
 });
+
 
 type OrderFormData = z.infer<typeof orderSchema>;
 
@@ -38,10 +52,14 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
 
     const { register, handleSubmit, control, watch, formState: { errors, isSubmitting } } = useForm<OrderFormData>({
         resolver: zodResolver(orderSchema),
-        defaultValues: { quantity: 1 },
+        defaultValues: { 
+            quantity: 1,
+            customerPaymentMethod: 'Cash on Delivery'
+        },
     });
 
     const quantity = watch('quantity');
+    const paymentMethod = watch('customerPaymentMethod');
     const totalAmount = product.price * quantity;
 
     const onSubmit = async (data: OrderFormData) => {
@@ -61,7 +79,6 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
         }
 
         try {
-            // Fetch dropshipper details
             const dropshipperRef = doc(firestore, 'users', refId);
             const dropshipperSnap = await getDoc(dropshipperRef);
             if (!dropshipperSnap.exists()) {
@@ -70,10 +87,11 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
             const dropshipper = dropshipperSnap.data() as UserProfile;
             const dropshipperName = `${dropshipper.firstName} ${dropshipper.lastName}`.trim();
 
+            const batch = writeBatch(firestore);
             const orderId = doc(collection(firestore, 'id_generator')).id;
             const orderRef = doc(firestore, 'orders', orderId);
 
-            const orderData = {
+            const orderData: any = {
                 id: orderId,
                 dropshipperId: refId,
                 dropshipperName,
@@ -81,7 +99,7 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
                 customerPhone: data.customerPhone,
                 customerAddress: data.customerAddress,
                 customerCity: data.customerCity,
-                customerPaymentMethod: 'Cash on Delivery',
+                customerPaymentMethod: data.customerPaymentMethod,
                 productId: product.id,
                 productName: product.name,
                 productImageUrl: product.imageUrls?.[0] || null,
@@ -97,7 +115,31 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
                 merchantName: product.merchantName || null,
             };
 
-            await setDoc(orderRef, orderData);
+            if (data.customerPaymentMethod !== 'Cash on Delivery') {
+                orderData.customerPaymentStatus = 'Pending';
+                orderData.customerPaymentProof = {
+                    senderPhoneNumber: data.paymentSenderNumber,
+                    referenceNumber: data.paymentTransactionId,
+                };
+                
+                const paymentId = doc(collection(firestore, 'id_generator')).id;
+                const paymentDocRef = doc(firestore, `payments/${paymentId}`);
+                const paymentData: Omit<Payment, 'createdAt' | 'updatedAt'> = {
+                    id: paymentId,
+                    orderId: orderId,
+                    dropshipperId: refId,
+                    dropshipperName: dropshipperName,
+                    paymentMethodId: data.customerPaymentMethod,
+                    amount: totalAmount,
+                    status: 'Pending',
+                    senderPhoneNumber: data.paymentSenderNumber!,
+                    referenceNumber: data.paymentTransactionId!,
+                };
+                batch.set(paymentDocRef, { ...paymentData, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+            }
+
+            batch.set(orderRef, orderData);
+            await batch.commit();
             setIsSuccess(true);
             
         } catch (error: any) {
@@ -149,10 +191,11 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
         <Card>
             <CardHeader>
                 <CardTitle>اطلب الآن</CardTitle>
-                <CardDescription>املأ بياناتك أدناه لإتمام عملية الشراء. الدفع عند الاستلام.</CardDescription>
+                <CardDescription>املأ بياناتك أدناه لإتمام عملية الشراء.</CardDescription>
             </CardHeader>
             <CardContent>
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {/* Customer Details */}
                     <div className="space-y-2">
                         <Label htmlFor="customerName">الاسم بالكامل</Label>
                         <Input id="customerName" {...register("customerName")} />
@@ -184,33 +227,79 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
                         <Input id="customerAddress" {...register("customerAddress")} />
                         {errors.customerAddress && <p className="text-sm text-destructive">{errors.customerAddress.message}</p>}
                     </div>
-                    <div className="grid grid-cols-3 gap-4 items-end">
-                         <div className="space-y-2 col-span-1">
-                            <Label htmlFor="quantity">الكمية</Label>
-                             <Controller
-                                name="quantity"
-                                control={control}
-                                render={({ field }) => (
-                                     <Select onValueChange={(val) => field.onChange(parseInt(val))} defaultValue={field.value.toString()}>
-                                        <SelectTrigger><SelectValue/></SelectTrigger>
-                                        <SelectContent>
-                                            {[...Array(Math.min(10, product.stockQuantity)).keys()].map(i => <SelectItem key={i+1} value={(i+1).toString()}>{i+1}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            />
-                        </div>
-                        <div className="col-span-2 space-y-2">
-                             <p className="text-sm text-muted-foreground">الإجمالي</p>
-                             <p className="text-2xl font-bold text-primary">{totalAmount.toFixed(2)} ج.م</p>
-                        </div>
+                    {/* Quantity */}
+                    <div className="space-y-2">
+                        <Label htmlFor="quantity">الكمية</Label>
+                         <Controller
+                            name="quantity"
+                            control={control}
+                            render={({ field }) => (
+                                 <Select onValueChange={(val) => field.onChange(parseInt(val))} defaultValue={field.value.toString()}>
+                                    <SelectTrigger><SelectValue/></SelectTrigger>
+                                    <SelectContent>
+                                        {[...Array(Math.min(10, product.stockQuantity)).keys()].map(i => <SelectItem key={i+1} value={(i+1).toString()}>{i+1}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        />
                     </div>
                      {errors.quantity && <p className="text-sm text-destructive">{errors.quantity.message}</p>}
 
-                    <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
-                        {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin"/>}
-                        {isSubmitting ? 'جاري إرسال الطلب...' : 'إتمام الطلب'}
-                    </Button>
+                    <Separator />
+
+                    {/* Payment Section */}
+                    <div className="space-y-2">
+                        <Label>طريقة الدفع</Label>
+                        <Controller
+                            name="customerPaymentMethod"
+                            control={control}
+                            render={({ field }) => (
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Cash on Delivery">الدفع عند الاستلام</SelectItem>
+                                        <SelectItem value="Vodafone Cash">فودافون كاش (دفع مسبق)</SelectItem>
+                                        <SelectItem value="InstaPay">انستا باي (دفع مسبق)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        />
+                    </div>
+
+                    {paymentMethod !== 'Cash on Delivery' && (
+                        <div className="p-4 rounded-md border border-primary/20 bg-primary/5 space-y-4">
+                            <h4 className="font-semibold">تعليمات الدفع المسبق</h4>
+                            <p className="text-sm text-muted-foreground">
+                                يرجى تحويل المبلغ الإجمالي <span className="font-bold text-primary">{totalAmount.toFixed(2)} ج.م</span> إلى الحساب التالي ثم إدخال بيانات التحويل.
+                            </p>
+                             {paymentMethod === 'Vodafone Cash' && <p className="font-mono p-2 bg-muted rounded-md text-center">01012345678</p>}
+                             {paymentMethod === 'InstaPay' && <p className="font-mono p-2 bg-muted rounded-md text-center">kemet.supply@instapay</p>}
+
+                            <div className="space-y-2">
+                                <Label htmlFor="paymentSenderNumber">رقم الهاتف الذي تم منه التحويل</Label>
+                                <Input id="paymentSenderNumber" {...register("paymentSenderNumber")} />
+                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="paymentTransactionId">رقم العملية أو آخر 4 أرقام من المحفظة</Label>
+                                <Input id="paymentTransactionId" {...register("paymentTransactionId")} />
+                                {errors.paymentTransactionId && <p className="text-sm text-destructive">{errors.paymentTransactionId.message}</p>}
+                            </div>
+                        </div>
+                    )}
+                    
+                    <Separator />
+                    
+                    <div className="space-y-4">
+                         <div className="flex justify-between items-center text-lg font-bold">
+                            <p>الإجمالي</p>
+                            <p className="text-2xl text-primary">{totalAmount.toFixed(2)} ج.م</p>
+                        </div>
+
+                        <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+                            {isSubmitting && <Loader2 className="me-2 h-4 w-4 animate-spin"/>}
+                            {isSubmitting ? 'جاري إرسال الطلب...' : 'إتمام الطلب'}
+                        </Button>
+                    </div>
                 </form>
             </CardContent>
         </Card>

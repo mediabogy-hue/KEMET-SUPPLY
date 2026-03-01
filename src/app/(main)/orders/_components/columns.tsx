@@ -1,4 +1,3 @@
-
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
@@ -30,7 +29,6 @@ const paymentStatusText: { [key: string]: string } = {
 
 export const getDropshipperOrderColumns = (
     onViewShipment: (order: Order) => void,
-    onMakePayment: (order: Order) => void,
     onReorder: (product: Partial<Product>) => void,
 ): ColumnDef<Order>[] => [
   {
@@ -81,17 +79,16 @@ export const getDropshipperOrderColumns = (
   },
     {
     accessorKey: "paymentStatus",
-    header: "حالة الدفع للمنصة",
+    header: "حالة الدفع",
     cell: ({ row }) => {
         const order = row.original;
-        const amountToPay = order.totalAmount - order.totalCommission;
-        if (amountToPay <= 0) {
-            return <Badge variant="default">لا يوجد</Badge>
+        if (order.customerPaymentMethod === 'Cash on Delivery') {
+            return <Badge variant="secondary">عند الاستلام</Badge>;
         }
         if (order.customerPaymentStatus) {
             return <Badge variant={paymentStatusVariant[order.customerPaymentStatus]}>{paymentStatusText[order.customerPaymentStatus]}</Badge>
         }
-        return <Badge variant="destructive">مطلوب الدفع</Badge>
+        return <Badge variant="outline">غير محدد</Badge>;
     }
   },
   {
@@ -116,7 +113,6 @@ export const getDropshipperOrderColumns = (
     id: "actions",
     cell: ({ row }) => {
       const order = row.original;
-      const amountToPay = order.totalAmount - order.totalCommission;
 
       return (
         <DropdownMenu>
@@ -128,12 +124,6 @@ export const getDropshipperOrderColumns = (
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-            {amountToPay > 0 && !order.customerPaymentStatus && (
-                <DropdownMenuItem onClick={() => onMakePayment(order)}>
-                    <Banknote className="me-2" />
-                    تسجيل إثبات الدفع
-                </DropdownMenuItem>
-            )}
              {order.shipmentId && (
                 <DropdownMenuItem onClick={() => onViewShipment(order)}>
                     <Eye className="me-2" />
