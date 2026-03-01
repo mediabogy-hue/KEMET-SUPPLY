@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -46,7 +45,7 @@ export function SeedDatabaseButton() {
         try {
             const batch = writeBatch(firestore);
 
-            // 1. Seed Users (Dropshippers)
+            // 1. Seed Users (Dropshippers) and their Wallets
             dropshippers.forEach(user => {
                 const userRef = doc(firestore, 'users', user.id);
                 batch.set(userRef, {
@@ -55,6 +54,16 @@ export function SeedDatabaseButton() {
                     role: 'Dropshipper',
                     isActive: true,
                     createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                });
+
+                const walletRef = doc(firestore, 'wallets', user.id);
+                batch.set(walletRef, {
+                    id: user.id,
+                    availableBalance: 0,
+                    pendingBalance: 0,
+                    pendingWithdrawals: 0,
+                    totalWithdrawn: 0,
                     updatedAt: serverTimestamp(),
                 });
             });

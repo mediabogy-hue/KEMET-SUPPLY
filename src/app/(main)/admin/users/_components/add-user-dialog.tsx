@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from "react";
@@ -127,7 +126,9 @@ export function AddUserDialog() {
       const newUser = userCredential.user;
       newUserUid = newUser.uid;
 
-      // Step 2: Create user profile in Firestore
+      // Step 2: Create user profile and wallet in Firestore using a batch
+      const batch = writeBatch(firestore);
+
       const userDocRef = doc(firestore, "users", newUser.uid);
       const userProfileData: Partial<UserProfile> = {
         id: newUser.uid,
@@ -143,8 +144,20 @@ export function AddUserDialog() {
         shiftStatus: 'off',
         canTrackShift: role === 'Dropshipper' ? canTrackShift : false,
       };
+      batch.set(userDocRef, userProfileData);
+
+      // Create wallet for the new user
+      const walletDocRef = doc(firestore, 'wallets', newUser.uid);
+      batch.set(walletDocRef, {
+          id: newUser.uid,
+          availableBalance: 0,
+          pendingBalance: 0,
+          pendingWithdrawals: 0,
+          totalWithdrawn: 0,
+          updatedAt: serverTimestamp(),
+      });
       
-      await setDoc(userDocRef, userProfileData);
+      await batch.commit();
       
       setCreationSuccessData({ email, password, phone, name: `${firstName} ${lastName}`});
 
