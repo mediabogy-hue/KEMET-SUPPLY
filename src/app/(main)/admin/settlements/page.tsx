@@ -17,8 +17,6 @@ export default function SettlementsPage() {
     const { isAdmin, isFinanceManager } = useSession();
     const [settlingOrderId, setSettlingOrderId] = useState<string | null>(null);
 
-    // Fetch latest 200 orders to avoid browser crashes and complex index requirements.
-    // This is a more robust approach than trying to query for the specific status.
     const recentOrdersQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(200));
@@ -26,10 +24,8 @@ export default function SettlementsPage() {
 
     const { data: recentOrders, isLoading, error } = useCollection<Order>(recentOrdersQuery);
 
-    // Filter for pending settlements on the client side from the fetched orders.
     const pendingSettlements = useMemo(() => {
         if (!recentOrders) return [];
-        // The query already sorts by date, so we just need to filter.
         return recentOrders.filter(order => order.status === 'Delivered' && order.isSettled !== true);
     }, [recentOrders]);
 
@@ -78,15 +74,14 @@ export default function SettlementsPage() {
                     if (merchantProfit > 0) {
                         const merchantWalletRef = doc(firestore, 'wallets', merchantId);
                         const merchantWalletDoc = await transaction.get(merchantWalletRef);
-
+                        const currentMerchantBalance = Number(merchantWalletDoc.data()?.availableBalance || 0);
+                        
                         if (merchantWalletDoc.exists()) {
-                             const currentMerchantBalance = Number(merchantWalletDoc.data()?.availableBalance || 0);
                              transaction.update(merchantWalletRef, { 
                                 availableBalance: currentMerchantBalance + merchantProfit,
                                 updatedAt: serverTimestamp() 
                             });
                         } else {
-                            // Create a full, new wallet if it doesn't exist
                             transaction.set(merchantWalletRef, {
                                 id: merchantId,
                                 availableBalance: merchantProfit,
