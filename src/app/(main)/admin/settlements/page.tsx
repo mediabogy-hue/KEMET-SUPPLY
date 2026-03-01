@@ -55,7 +55,12 @@ export default function SettlementsPage() {
                 if (typeof dropshipperId === 'string' && dropshipperId.trim() !== '' && orderDropshipperCommission > 0) {
                     const walletRef = doc(firestore, 'wallets', dropshipperId);
                     const walletDoc = await transaction.get(walletRef);
-                    const currentBalance = walletDoc.data()?.availableBalance || 0;
+                    
+                    const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
+                    if (isNaN(currentBalance)) {
+                        throw new Error(`رصيد المحفظة الحالي للمسوق (${dropshipperId}) غير صالح.`);
+                    }
+
                     const newBalance = currentBalance + orderDropshipperCommission;
                     transaction.set(walletRef, { id: dropshipperId, availableBalance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
                 }
@@ -70,7 +75,12 @@ export default function SettlementsPage() {
                     if (merchantProfit > 0) {
                         const walletRef = doc(firestore, 'wallets', merchantId);
                         const walletDoc = await transaction.get(walletRef);
-                        const currentBalance = walletDoc.data()?.availableBalance || 0;
+                        
+                        const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
+                        if (isNaN(currentBalance)) {
+                           throw new Error(`رصيد المحفظة الحالي للتاجر (${merchantId}) غير صالح.`);
+                        }
+
                         const newBalance = currentBalance + merchantProfit;
                         transaction.set(walletRef, { id: merchantId, availableBalance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
                     } else if (merchantProfit < 0) {
@@ -91,7 +101,7 @@ export default function SettlementsPage() {
              toast({
                 variant: 'destructive',
                 title: 'فشل إتمام التسوية المالية',
-                description: `للطلب #${order.id.substring(0, 5)}: ${e.message}`,
+                description: `للطلب #${order.id.substring(0, 7)}: ${e.message}`,
                 duration: 10000,
             });
         } finally {
