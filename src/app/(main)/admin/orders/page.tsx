@@ -75,21 +75,14 @@ export default function AdminOrdersPage() {
                         const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
                         const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
                         
-                        if (dropshipperWalletDoc.exists()) {
-                            transaction.update(dropshipperWalletRef, {
-                                availableBalance: increment(orderDropshipperCommission),
-                                updatedAt: serverTimestamp()
-                            });
-                        } else {
-                            transaction.set(dropshipperWalletRef, {
-                                id: dropshipperId,
-                                availableBalance: orderDropshipperCommission,
-                                pendingBalance: 0,
-                                pendingWithdrawals: 0,
-                                totalWithdrawn: 0,
-                                updatedAt: serverTimestamp()
-                            });
-                        }
+                        const currentBalance = dropshipperWalletDoc.data()?.availableBalance || 0;
+                        const newBalance = currentBalance + orderDropshipperCommission;
+
+                        transaction.set(dropshipperWalletRef, {
+                            id: dropshipperId,
+                            availableBalance: newBalance,
+                            updatedAt: serverTimestamp()
+                        }, { merge: true });
                     }
 
                     // Settle for Merchant
@@ -102,24 +95,18 @@ export default function AdminOrdersPage() {
                         }
                         
                         if (merchantProfit > 0) {
-                            const merchantWalletRef = doc(firestore, 'wallets', merchantId);
+                             const merchantWalletRef = doc(firestore, 'wallets', merchantId);
                             const merchantWalletDoc = await transaction.get(merchantWalletRef);
 
-                            if (merchantWalletDoc.exists()) {
-                                transaction.update(merchantWalletRef, {
-                                    availableBalance: increment(merchantProfit),
-                                    updatedAt: serverTimestamp()
-                                });
-                            } else {
-                                transaction.set(merchantWalletRef, {
-                                    id: merchantId,
-                                    availableBalance: merchantProfit,
-                                    pendingBalance: 0,
-                                    pendingWithdrawals: 0,
-                                    totalWithdrawn: 0,
-                                    updatedAt: serverTimestamp()
-                                });
-                            }
+                            const currentBalance = merchantWalletDoc.data()?.availableBalance || 0;
+                            const newBalance = currentBalance + merchantProfit;
+                            
+                            transaction.set(merchantWalletRef, {
+                                id: merchantId,
+                                availableBalance: newBalance,
+                                updatedAt: serverTimestamp()
+                            }, { merge: true });
+
                         } else if (merchantProfit < 0) {
                             throw new Error(`Negative profit (${merchantProfit.toFixed(2)}) calculated. Check order financials.`);
                         }
