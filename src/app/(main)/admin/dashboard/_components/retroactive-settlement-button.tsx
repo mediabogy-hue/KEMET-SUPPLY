@@ -47,7 +47,7 @@ export function RetroactiveSettlementButton() {
             );
 
             const querySnapshot = await getDocs(q);
-            const ordersToSettle = querySnapshot.docs.map(d => d.data() as Order);
+            const ordersToSettle = querySnapshot.docs.map(d => ({ id: d.id, ...d.data() }) as Order);
 
             if (ordersToSettle.length === 0) {
                 toast({ title: 'لا توجد طلبات قديمة لتسويتها', description: 'جميع الطلبات المكتملة مسواة بالفعل.' });
