@@ -36,13 +36,12 @@ export default function SettlementsPage() {
         if (!firestore) return;
 
         setSettlingOrderId(order.id);
-        toast({ title: `جاري تسوية أرباح الطلب #${order.id.substring(0, 5)}...` });
         
         try {
             await runTransaction(firestore, async (transaction) => {
                 const orderRef = doc(firestore, 'orders', order.id);
 
-                // Validation
+                // --- Validation ---
                 const orderTotalAmount = Number(order.totalAmount || 0);
                 const orderDropshipperCommission = Number(order.totalCommission || 0);
                 const orderPlatformFee = Number(order.platformFee || 0);
@@ -50,45 +49,71 @@ export default function SettlementsPage() {
                     throw new Error(`بيانات الطلب المالية غير صالحة.`);
                 }
 
-                // 1. Settle for Dropshipper
+                // --- 1. Settle for Dropshipper ---
                 const dropshipperId = order.dropshipperId;
                 if (typeof dropshipperId === 'string' && dropshipperId.trim() !== '' && orderDropshipperCommission > 0) {
                     const walletRef = doc(firestore, 'wallets', dropshipperId);
                     const walletDoc = await transaction.get(walletRef);
                     
-                    const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
-                    if (isNaN(currentBalance)) {
-                        throw new Error(`رصيد المحفظة الحالي للمسوق (${dropshipperId}) غير صالح.`);
+                    if (walletDoc.exists()) {
+                        const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
+                        if (isNaN(currentBalance)) {
+                            throw new Error(`رصيد محفظة المسوق (${dropshipperId}) غير صالح.`);
+                        }
+                        transaction.update(walletRef, { 
+                            availableBalance: currentBalance + orderDropshipperCommission,
+                            updatedAt: serverTimestamp() 
+                        });
+                    } else {
+                        // Wallet does not exist, create it fully initialized
+                        transaction.set(walletRef, {
+                            id: dropshipperId,
+                            availableBalance: orderDropshipperCommission,
+                            pendingBalance: 0,
+                            pendingWithdrawals: 0,
+                            totalWithdrawn: 0,
+                            updatedAt: serverTimestamp(),
+                        });
                     }
-
-                    const newBalance = currentBalance + orderDropshipperCommission;
-                    transaction.set(walletRef, { id: dropshipperId, availableBalance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
                 }
 
-                // 2. Settle for Merchant
+                // --- 2. Settle for Merchant ---
                 const merchantId = order.merchantId;
                 if (typeof merchantId === 'string' && merchantId.trim() !== '') {
                     const merchantProfit = orderTotalAmount - orderDropshipperCommission - orderPlatformFee;
-                     if (isNaN(merchantProfit)) {
+                    if (isNaN(merchantProfit)) {
                         throw new Error(`فشل حساب ربح التاجر.`);
                     }
                     if (merchantProfit > 0) {
                         const walletRef = doc(firestore, 'wallets', merchantId);
                         const walletDoc = await transaction.get(walletRef);
-                        
-                        const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
-                        if (isNaN(currentBalance)) {
-                           throw new Error(`رصيد المحفظة الحالي للتاجر (${merchantId}) غير صالح.`);
-                        }
 
-                        const newBalance = currentBalance + merchantProfit;
-                        transaction.set(walletRef, { id: merchantId, availableBalance: newBalance, updatedAt: serverTimestamp() }, { merge: true });
+                        if (walletDoc.exists()) {
+                            const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
+                            if (isNaN(currentBalance)) {
+                               throw new Error(`رصيد محفظة التاجر (${merchantId}) غير صالح.`);
+                            }
+                            transaction.update(walletRef, { 
+                                availableBalance: currentBalance + merchantProfit,
+                                updatedAt: serverTimestamp() 
+                            });
+                        } else {
+                            // Wallet does not exist, create it fully initialized
+                            transaction.set(walletRef, {
+                                id: merchantId,
+                                availableBalance: merchantProfit,
+                                pendingBalance: 0,
+                                pendingWithdrawals: 0,
+                                totalWithdrawn: 0,
+                                updatedAt: serverTimestamp(),
+                            });
+                        }
                     } else if (merchantProfit < 0) {
                          throw new Error(`ربح التاجر سالب (${merchantProfit.toFixed(2)}).`);
                     }
                 }
                 
-                // 3. Mark order as settled
+                // --- 3. Mark order as settled ---
                 transaction.update(orderRef, { isSettled: true, updatedAt: serverTimestamp() });
             });
 
