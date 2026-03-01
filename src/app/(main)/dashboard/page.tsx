@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useMemo } from 'react';
@@ -9,7 +8,7 @@ import { useSession } from "@/auth/SessionProvider";
 import { useFirebase } from '@/firebase/provider';
 import { useCollection, useMemoFirebase } from "@/firebase";
 import type { Order } from "@/lib/types";
-import { collection, query, where, orderBy, Timestamp } from "firebase/firestore";
+import { collection, query, where, Timestamp } from "firebase/firestore";
 import { format, subDays } from 'date-fns';
 import { RecentSales } from './_components/recent-sales';
 import { DollarSign, ShoppingCart, Activity } from 'lucide-react';
@@ -32,12 +31,16 @@ export default function DashboardPage() {
         return query(
             collection(firestore, "orders"),
             where("dropshipperId", "==", user.uid),
-            where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo)),
-            orderBy("createdAt", "desc")
+            where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo))
         );
     }, [firestore, user]);
 
     const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+
+    const sortedOrders = useMemo(() => {
+        if (!orders) return [];
+        return [...orders].sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
+    }, [orders]);
 
     const stats = useMemo(() => {
         if (!orders) {
@@ -78,14 +81,14 @@ export default function DashboardPage() {
     }, [orders]);
     
     const recentSalesData = useMemo(() => {
-        if (!orders) return undefined; // Important for RecentSales component check
-        return orders.slice(0, 5).map(order => ({
+        if (!sortedOrders) return undefined;
+        return sortedOrders.slice(0, 5).map(order => ({
             id: order.id,
             name: order.customerName,
             email: order.customerPhone,
             amount: `+${(order.totalCommission || 0).toFixed(2)} ج.م`
         }));
-    }, [orders]);
+    }, [sortedOrders]);
 
 
     return (
