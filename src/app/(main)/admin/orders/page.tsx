@@ -59,53 +59,52 @@ export default function AdminOrdersPage() {
             try {
                 await runTransaction(firestore, async (transaction) => {
                     const orderRef = doc(firestore, 'orders', order.id);
-                    const dropshipperWalletRef = doc(firestore, 'wallets', order.dropshipperId);
                     
-                    // 1. Validate data before reads
+                    // --- 1. Safely parse all monetary values from the order ---
+                    const orderTotalAmount = Number(order.totalAmount || 0);
+                    const orderDropshipperCommission = Number(order.totalCommission || 0);
+                    const orderPlatformFee = Number(order.platformFee || 0);
+
+                    if (isNaN(orderTotalAmount) || isNaN(orderDropshipperCommission) || isNaN(orderPlatformFee)) {
+                        throw new Error(`Order ${order.id} contains invalid financial data.`);
+                    }
+
+                    // --- 2. Update Dropshipper Wallet ---
                     const dropshipperId = order.dropshipperId;
-                    if (!dropshipperId || typeof dropshipperId !== 'string' || dropshipperId.length < 5) {
-                        throw new Error(`Invalid dropshipperId: ${dropshipperId}`);
-                    }
-                    
-                    const dropshipperCommission = Number(order.totalCommission || 0);
-                    if (isNaN(dropshipperCommission)) {
-                         throw new Error(`Invalid dropshipper commission amount for order ${order.id}`);
+                    if (!dropshipperId || typeof dropshipperId !== 'string') {
+                        throw new Error(`Order ${order.id} has an invalid dropshipperId.`);
                     }
 
-                    // 2. Read wallet states within the transaction
-                    const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
-                    const currentDropshipperBalance = dropshipperWalletDoc.data()?.availableBalance || 0;
-                    
-                    // 3. Update Order Status
-                    transaction.update(orderRef, { status: 'Delivered', deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() });
-
-                    // 4. Update Dropshipper Wallet
-                    if (dropshipperCommission !== 0) {
-                       transaction.set(dropshipperWalletRef, {
-                            availableBalance: currentDropshipperBalance + dropshipperCommission,
+                    if (orderDropshipperCommission > 0) {
+                        const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
+                        const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
+                        const currentDropshipperBalance = Number(dropshipperWalletDoc.data()?.availableBalance || 0);
+                        if (isNaN(currentDropshipperBalance)) {
+                            throw new Error(`Dropshipper wallet ${dropshipperId} has an invalid balance.`);
+                        }
+                        transaction.set(dropshipperWalletRef, {
+                            availableBalance: currentDropshipperBalance + orderDropshipperCommission,
                             updatedAt: serverTimestamp()
                         }, { merge: true });
                     }
 
-                    // 5. Settle Merchant's profit if applicable
+                    // --- 3. Update Merchant Wallet (if applicable) ---
                     const merchantId = order.merchantId;
-                    if (merchantId && typeof merchantId === 'string' && merchantId.length > 5) {
-                        const totalAmount = Number(order.totalAmount || 0);
-                        const platformFee = Number(order.platformFee || 0);
-
-                        if (isNaN(totalAmount) || isNaN(platformFee)) {
-                            throw new Error(`Invalid financial data for order ${order.id}. Amount: ${order.totalAmount}, Fee: ${order.platformFee}`);
-                        }
-
-                        const merchantProfit = totalAmount - dropshipperCommission - platformFee;
+                    if (merchantId && typeof merchantId === 'string' && merchantId.length > 1) {
+                        const merchantProfit = orderTotalAmount - orderDropshipperCommission - orderPlatformFee;
+                        
                         if (isNaN(merchantProfit)) {
-                            throw new Error(`Merchant profit calculation resulted in NaN for order ${order.id}`);
+                            throw new Error(`Merchant profit calculation failed for order ${order.id}.`);
                         }
 
-                        if (merchantProfit !== 0) {
+                        if (merchantProfit > 0) {
                             const merchantWalletRef = doc(firestore, 'wallets', merchantId);
                             const merchantWalletDoc = await transaction.get(merchantWalletRef);
-                            const currentMerchantBalance = merchantWalletDoc.data()?.availableBalance || 0;
+                            const currentMerchantBalance = Number(merchantWalletDoc.data()?.availableBalance || 0);
+
+                            if (isNaN(currentMerchantBalance)) {
+                                 throw new Error(`Merchant wallet ${merchantId} has an invalid balance.`);
+                            }
 
                             transaction.set(merchantWalletRef, {
                                 availableBalance: currentMerchantBalance + merchantProfit,
@@ -113,6 +112,9 @@ export default function AdminOrdersPage() {
                             }, { merge: true });
                         }
                     }
+
+                    // --- 4. Finally, update the order status ---
+                    transaction.update(orderRef, { status: 'Delivered', deliveredAt: serverTimestamp(), updatedAt: serverTimestamp() });
                 });
 
                 toast({
