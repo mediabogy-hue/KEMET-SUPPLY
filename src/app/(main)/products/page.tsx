@@ -1,42 +1,65 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession } from '@/auth/SessionProvider';
-import { collection, query, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { CategoryBrowser } from './_components/category-browser';
 import { ProductCard } from './_components/product-card';
+import { useToast } from '@/hooks/use-toast';
 
 export default function ProductsPage() {
     const { user, firestore } = useSession();
+    const { toast } = useToast();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // Fetch all products and filter/sort on the client to avoid indexing issues.
-    const productsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return collection(firestore, 'products');
-    }, [firestore, user]);
+    const [products, setProducts] = useState<Product[] | null>(null);
+    const [productsLoading, setProductsLoading] = useState(true);
 
-    const { data: products, isLoading: productsLoading } = useCollection<Product>(productsQuery);
+    useEffect(() => {
+        if (!firestore) {
+            setProductsLoading(false);
+            return;
+        }
+
+        const fetchProducts = async () => {
+            setProductsLoading(true);
+            try {
+                const productsCollection = collection(firestore, 'products');
+                const productsSnapshot = await getDocs(productsCollection);
+                const productsList = productsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Product);
+                setProducts(productsList);
+            } catch (error: any) {
+                console.error("Failed to fetch products:", error);
+                toast({ variant: 'destructive', title: 'فشل تحميل المنتجات', description: error.message });
+            } finally {
+                setProductsLoading(false);
+            }
+        };
+
+        fetchProducts();
+    }, [firestore, toast]);
+
 
     const filteredAndSortedProducts = useMemo(() => {
         if (!products) return [];
         
         let processedProducts = products
-            // 1. Filter for available products
             .filter(p => p.isAvailable)
-            // 2. Filter by selected category
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
-            // 3. Filter by search term
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
             
-        // 4. Sort by creation date (newest first)
-        processedProducts.sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+        // The type assertion is needed because Firestore's Timestamp and JS Date are different
+        processedProducts.sort((a, b) => {
+            const timeA = (a.createdAt as any)?.toMillis?.() || 0;
+            const timeB = (b.createdAt as any)?.toMillis?.() || 0;
+            return timeB - timeA;
+        });
 
         return processedProducts;
     }, [products, searchTerm, selectedCategory]);

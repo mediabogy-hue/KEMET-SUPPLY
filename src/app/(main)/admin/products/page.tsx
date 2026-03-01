@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { useState, useMemo, useEffect } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, query, orderBy, doc, deleteDoc, getDocs } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,11 +31,33 @@ export default function AdminProductsPage() {
     const [productToAnalyze, setProductToAnalyze] = useState<Product | null>(null);
     const [productToUpdateStock, setProductToUpdateStock] = useState<Product | null>(null);
 
-    const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, "products"), orderBy("createdAt", "desc")) : null),
-        [firestore]
-    );
-    const { data: products, isLoading, error } = useCollection<Product>(productsQuery);
+    // New state for one-time data fetch
+    const [products, setProducts] = useState<Product[] | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        if (!firestore) return;
+
+        const fetchProducts = async () => {
+            setIsLoading(true);
+            try {
+                const q = query(collection(firestore, "products"), orderBy("createdAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                const fetchedProducts = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Product);
+                setProducts(fetchedProducts);
+                setError(null);
+            } catch (err: any) {
+                setError(err);
+                toast({ variant: 'destructive', title: 'فشل تحميل المنتجات', description: err.message });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchProducts();
+    }, [firestore, toast]);
+
 
     const handleDelete = async () => {
         if (!firestore || !productToDelete) return;
@@ -43,6 +65,8 @@ export default function AdminProductsPage() {
         
         try {
             await deleteDoc(productRef);
+            // Manually update local state
+            setProducts(prev => prev?.filter(p => p.id !== productToDelete.id) || null);
             setProductToDelete(null);
         } catch (e) {
             console.error('Failed to delete product:', e);

@@ -1,9 +1,9 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { useState, useMemo, useEffect } from 'react';
+import { useFirestore } from '@/firebase';
+import { collection, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, getDocs } from 'firebase/firestore';
 import type { Order, Shipment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,12 +24,34 @@ export default function AdminOrdersPage() {
     const [orderToViewShipment, setOrderToViewShipment] = useState<Order | null>(null);
     const [shipmentDetails, setShipmentDetails] = useState<Shipment | null>(null);
 
-    // Fetch orders
-    const ordersQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'orders'), orderBy('createdAt', 'desc')) : null),
-        [firestore]
-    );
-    const { data: orders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(ordersQuery);
+    // New state for one-time data fetch
+    const [orders, setOrders] = useState<Order[] | null>(null);
+    const [ordersLoading, setOrdersLoading] = useState(true);
+    const [ordersError, setOrdersError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        if (!firestore) return;
+
+        const fetchOrders = async () => {
+            setOrdersLoading(true);
+            try {
+                const q = query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'));
+                const querySnapshot = await getDocs(q);
+                const fetchedOrders = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Order);
+                setOrders(fetchedOrders);
+                setOrdersError(null);
+            } catch (err: any) {
+                setOrdersError(err);
+                toast({ variant: 'destructive', title: 'فشل تحميل الطلبات', description: err.message });
+                console.error("Error fetching orders: ", err);
+            } finally {
+                setOrdersLoading(false);
+            }
+        };
+
+        fetchOrders();
+    }, [firestore, toast]);
+
 
     const handleStatusUpdate = async (order: Order, status: Order['status']) => {
         if (!firestore) return;
@@ -44,7 +66,12 @@ export default function AdminOrdersPage() {
             if (status === 'Canceled') updateData.canceledAt = serverTimestamp();
 
             await updateDoc(orderRef, updateData);
-            // Success toast removed for better UX. The UI will update via the listener.
+            
+            // Manually update local state for faster UI feedback
+            setOrders(prevOrders => 
+                prevOrders?.map(o => o.id === order.id ? { ...o, status: status } : o) || null
+            );
+
         } catch (e) {
             console.error('Failed to update order status:', e);
             toast({ variant: 'destructive', title: 'فشل تحديث الحالة' });
@@ -62,6 +89,10 @@ export default function AdminOrdersPage() {
                 updatedAt: serverTimestamp(),
             });
             setOrderToShip(null);
+            // Manually update local state
+             setOrders(prevOrders => 
+                prevOrders?.map(o => o.id === orderId ? { ...o, status: 'Ready to Ship', shipmentId, shipmentTrackingNumber } : o) || null
+            );
         } catch (e) {
             console.error("Failed to link shipment to order:", e);
         }
@@ -73,6 +104,8 @@ export default function AdminOrdersPage() {
         
         try {
             await deleteDoc(orderRef);
+            // Manually update local state
+            setOrders(prevOrders => prevOrders?.filter(o => o.id !== orderToDelete.id) || null);
             setOrderToDelete(null);
         } catch (e) {
             console.error('Failed to delete order:', e);
@@ -105,8 +138,8 @@ export default function AdminOrdersPage() {
     );
 
     const onBostaDialogShipmentCreated = () => {
-        // This is a simplified refresh. For a more robust solution, you'd re-fetch data.
-        // For now, we just close the dialog. The real-time listener will update the table.
+        // After manual creation, we can refetch or just close the dialog.
+        // The local state update in handleShipmentCreated should cover this.
         setOrderToShip(null);
     }
     
