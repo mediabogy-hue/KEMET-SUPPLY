@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useState, useMemo, useCallback } from 'react';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { useSession } from '@/auth/SessionProvider';
 import { collection, query, where, doc, getDoc } from 'firebase/firestore'; // Removed orderBy
 import type { Order, Shipment, Product } from '@/lib/types';
@@ -46,7 +47,7 @@ export default function MyOrdersPage() {
     }, [orders]);
 
 
-    const handleViewShipment = async (order: Order) => {
+    const handleViewShipment = useCallback(async (order: Order) => {
         if (!firestore || !order.shipmentId) return;
         setOrderToViewShipment(order);
         try {
@@ -63,15 +64,15 @@ export default function MyOrdersPage() {
             toast({ variant: 'destructive', title: 'فشل جلب تفاصيل الشحنة' });
             setOrderToViewShipment(null);
         }
-    };
+    }, [firestore, toast]);
     
-    const handleReorder = (product: Partial<Product>) => {
+    const handleReorder = useCallback((product: Partial<Product>) => {
         router.push(`/orders/new?productId=${product.id}`);
-    };
+    }, [router]);
 
     const columns = useMemo(
         () => getDropshipperOrderColumns(handleViewShipment, handleReorder),
-        [router]
+        [handleViewShipment, handleReorder]
     );
 
      if (error) {
