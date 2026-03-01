@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -25,17 +26,26 @@ export default function DashboardPage() {
     const { user, profile } = useSession();
     const { firestore } = useFirebase();
 
+    // Fetch all orders for the user, then filter by date on the client
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
-        const thirtyDaysAgo = subDays(new Date(), 30);
         return query(
             collection(firestore, "orders"),
-            where("dropshipperId", "==", user.uid),
-            where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo))
+            where("dropshipperId", "==", user.uid)
         );
     }, [firestore, user]);
 
-    const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+    const { data: allOrders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+
+    // Memoize the date-filtered orders
+    const orders = useMemo(() => {
+        if (!allOrders) return null;
+        const thirtyDaysAgo = subDays(new Date(), 30);
+        return allOrders.filter(order => {
+            const orderDate = order.createdAt?.toDate?.();
+            return orderDate && orderDate >= thirtyDaysAgo;
+        });
+    }, [allOrders]);
 
     const sortedOrders = useMemo(() => {
         if (!orders) return [];
