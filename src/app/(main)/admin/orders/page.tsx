@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirestore } from '@/firebase';
-import { collection, query, orderBy, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, getDocs, writeBatch, increment } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, writeBatch, increment } from 'firebase/firestore';
 import type { Order, Shipment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,33 +27,22 @@ export default function AdminOrdersPage() {
     const [orderToViewShipment, setOrderToViewShipment] = useState<Order | null>(null);
     const [shipmentDetails, setShipmentDetails] = useState<Shipment | null>(null);
 
-    // New state for one-time data fetch
-    const [orders, setOrders] = useState<Order[] | null>(null);
-    const [ordersLoading, setOrdersLoading] = useState(true);
-    const [ordersError, setOrdersError] = useState<Error | null>(null);
+    // Use real-time listener for orders
+    const ordersQuery = useMemoFirebase(
+        () => (firestore ? query(collection(firestore, 'orders')) : null),
+        [firestore]
+    );
+    const { data: orders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(ordersQuery);
 
-    useEffect(() => {
-        if (!firestore) return;
-
-        const fetchOrders = async () => {
-            setOrdersLoading(true);
-            try {
-                const q = query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'));
-                const querySnapshot = await getDocs(q);
-                const fetchedOrders = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }) as Order);
-                setOrders(fetchedOrders);
-                setOrdersError(null);
-            } catch (err: any) {
-                setOrdersError(err);
-                toast({ variant: 'destructive', title: 'فشل تحميل الطلبات', description: err.message });
-                console.error("Error fetching orders: ", err);
-            } finally {
-                setOrdersLoading(false);
-            }
-        };
-
-        fetchOrders();
-    }, [firestore, toast]);
+    // Sort on the client to avoid indexing issues
+    const sortedOrders = useMemo(() => {
+        if (!orders) return [];
+        return [...orders].sort((a, b) => {
+            const dateA = a.createdAt?.toDate?.().getTime() || 0;
+            const dateB = b.createdAt?.toDate?.().getTime() || 0;
+            return dateB - dateA;
+        });
+    }, [orders]);
 
 
     const handleStatusUpdate = async (order: Order, status: Order['status']) => {
@@ -94,9 +83,6 @@ export default function AdminOrdersPage() {
                 
                 await batch.commit();
                 
-                // Update local state
-                setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status: 'Delivered' } : o) || null);
-                
                 toast({
                     title: '🎉 تم تأكيد التوصيل والتسوية المالية!',
                     description: `تم إضافة الأرباح إلى محافظ المسوق ${order.merchantId ? 'والتاجر' : ''}.`,
@@ -122,7 +108,7 @@ export default function AdminOrdersPage() {
             if (status === 'Canceled') updateData.canceledAt = serverTimestamp();
 
             await updateDoc(orderRef, updateData);
-            setOrders(prev => prev?.map(o => o.id === order.id ? { ...o, status } : o) || null);
+            // No need to update local state, useCollection handles it
             toast({ title: 'تم تحديث الحالة بنجاح.' });
         } catch (e) {
             console.error('Failed to update order status:', e);
@@ -141,10 +127,7 @@ export default function AdminOrdersPage() {
                 updatedAt: serverTimestamp(),
             });
             setOrderToShip(null);
-            // Manually update local state
-             setOrders(prevOrders => 
-                prevOrders?.map(o => o.id === orderId ? { ...o, status: 'Ready to Ship', shipmentId, shipmentTrackingNumber } : o) || null
-            );
+            // No need to update local state, useCollection handles it
         } catch (e) {
             console.error("Failed to link shipment to order:", e);
         }
@@ -156,8 +139,7 @@ export default function AdminOrdersPage() {
         
         try {
             await deleteDoc(orderRef);
-            // Manually update local state
-            setOrders(prevOrders => prevOrders?.filter(o => o.id !== orderToDelete.id) || null);
+            // No need to update local state, useCollection handles it
             setOrderToDelete(null);
         } catch (e) {
             console.error('Failed to delete order:', e);
@@ -190,8 +172,6 @@ export default function AdminOrdersPage() {
     );
 
     const onBostaDialogShipmentCreated = () => {
-        // After manual creation, we can refetch or just close the dialog.
-        // The local state update in handleShipmentCreated should cover this.
         setOrderToShip(null);
     }
     
@@ -223,7 +203,7 @@ export default function AdminOrdersPage() {
                             <Skeleton className="h-10 w-full" />
                         </div>
                     ) : (
-                        <DataTable columns={columns} data={orders || []} />
+                        <DataTable columns={columns} data={sortedOrders || []} />
                     )}
                 </CardContent>
             </Card>
@@ -256,3 +236,5 @@ export default function AdminOrdersPage() {
         </div>
     );
 }
+
+    
