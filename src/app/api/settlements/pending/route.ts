@@ -1,15 +1,9 @@
+// This server-side API route has been removed and replaced with a robust client-side implementation.
+// The new logic in `src/app/(main)/admin/settlements/page.tsx` uses Firestore Transactions 
+// to ensure data consistency and avoid server configuration issues.
+// This file can be deleted.
 import { NextResponse } from "next/server";
 
-export const runtime = "nodejs";
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
-
 export async function GET(req: Request) {
-  try {
-    const { handleGetPendingSettlements } = await import("./handler");
-    return await handleGetPendingSettlements();
-  } catch (e: any) {
-    console.error("GET /api/settlements/pending Route Error:", e);
-    return NextResponse.json({ error: "Failed to load API handler." }, { status: 500 });
-  }
+    return NextResponse.json({ error: "This API endpoint is no longer in use." }, { status: 410 });
 }
