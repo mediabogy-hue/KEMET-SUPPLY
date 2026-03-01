@@ -1,41 +1,29 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebaseClient';
+import { notFound, useSearchParams } from 'next/navigation';
+import { doc, getDoc } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
 import type { Product } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
 import { ProductView } from './_components/product-view';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
-// Helper to convert Firestore Timestamps to Date objects. This is important for client components.
-const convertTimestampProps = (data: any): any => {
-    const newData: { [key: string]: any } = { ...data };
-    for (const key of ['createdAt', 'updatedAt']) {
-        if (newData[key] && typeof newData[key].toDate === 'function') {
-            newData[key] = newData[key].toDate();
-        }
-    }
-    return newData;
-};
-
-
-export default function PublicProductPage({ params, searchParams }: { 
+export default function PublicProductPage({ params }: { 
     params: { productId: string };
-    searchParams: { [key: string]: string | string[] | undefined };
 }) {
-    const { productId } = params;
-    const refId = typeof searchParams.ref === 'string' ? searchParams.ref : null;
+    const firestore = useFirestore();
+    const searchParams = useSearchParams();
     
     const [product, setProduct] = useState<Product | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    
+    const refId = searchParams.get('ref');
 
     useEffect(() => {
-        if (!productId) {
-            setError("لم يتم تحديد معرّف المنتج في الرابط.");
+        if (!params.productId || !firestore) {
             setIsLoading(false);
             return;
         }
@@ -44,68 +32,66 @@ export default function PublicProductPage({ params, searchParams }: {
             setIsLoading(true);
             setError(null);
             try {
-                const productRef = doc(db, 'products', productId);
+                const productRef = doc(firestore, 'products', params.productId);
                 const docSnap = await getDoc(productRef);
 
-                if (docSnap.exists() && docSnap.data().isAvailable) {
-                    const productData = convertTimestampProps(docSnap.data());
-                    setProduct({ id: docSnap.id, ...productData } as Product);
+                if (!docSnap.exists() || !docSnap.data()?.isAvailable) {
+                    setError('Product not found or is unavailable.');
                 } else {
-                    setError("عذراً، لم نتمكن من العثور على هذا المنتج. قد يكون الرابط غير صحيح أو تمت إزالة المنتج.");
+                    const data = docSnap.data() as Omit<Product, 'id'>;
+                    setProduct({ id: docSnap.id, ...data });
                 }
             } catch (err) {
-                console.error("Product fetching error:", err);
-                setError("حدث خطأ أثناء تحميل بيانات المنتج. الرجاء المحاولة مرة أخرى.");
+                console.error("Failed to fetch product:", err);
+                setError('Failed to load product data.');
             } finally {
                 setIsLoading(false);
             }
         };
 
         fetchProduct();
-    }, [productId]);
+    }, [params.productId, firestore]);
 
-    const renderContent = () => {
-        if (isLoading) {
-            return (
+    if (isLoading) {
+        return (
+            <div className="container mx-auto p-4 md:p-8 max-w-6xl">
                 <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
                     <div className="space-y-4">
-                        <Skeleton className="w-full aspect-square" />
-                    </div>
-                    <div className="space-y-6">
                         <Skeleton className="h-6 w-1/4" />
                         <Skeleton className="h-10 w-3/4" />
-                        <Skeleton className="h-6 w-1/3" />
-                        <Separator />
-                        <Skeleton className="h-20 w-full" />
-                        <Skeleton className="h-48 w-full" />
+                        <Skeleton className="h-8 w-1/3" />
+                        <Skeleton className="h-24 w-full" />
+                        <Skeleton className="h-64 w-full" />
                     </div>
                 </div>
-            );
-        }
+            </div>
+        );
+    }
+    
+    if (error) {
+         return (
+            <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+                <Card className="bg-destructive/10 border-destructive/30">
+                    <CardHeader>
+                        <CardTitle className="text-destructive">عفواً، حدث خطأ</CardTitle>
+                        <CardDescription className="text-destructive/80">
+                           عذراً، لم نتمكن من العثور على هذا المنتج. قد يكون الرابط غير صحيح أو تمت إزالة المنتج.
+                        </CardDescription>
+                    </CardHeader>
+                </Card>
+            </div>
+        );
+    }
 
-        if (error) {
-            return (
-                <Alert variant="destructive" className="max-w-2xl mx-auto">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>خطأ</AlertTitle>
-                    <AlertDescription>
-                        {error}
-                    </AlertDescription>
-                </Alert>
-            );
-        }
-        
-        if (product) {
-            return <ProductView product={product} refId={refId} />;
-        }
-        
+    if (!product) {
         // This case should be covered by the error state, but as a fallback.
-        return null;
-    };
+        notFound();
+    }
 
     return (
         <div className="container mx-auto p-4 md:p-8 max-w-6xl">
-            {renderContent()}
+            <ProductView product={product} refId={refId} />
         </div>
     );
 }
