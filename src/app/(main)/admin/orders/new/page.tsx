@@ -60,6 +60,7 @@ export default function NewOrderPage() {
   const quantity = watch("quantity");
   const totalAmount = selectedProduct ? selectedProduct.price * quantity : 0;
   const totalCommission = selectedProduct ? (selectedProduct.commission || 0) * quantity : 0;
+  const platformFee = totalAmount * 0.10;
 
   const onSubmit = async (data: OrderFormData) => {
     if (!user || !firestore || !selectedProduct || !userProfile) {
@@ -88,7 +89,7 @@ export default function NewOrderPage() {
       unitCommission: selectedProduct.commission || 0,
       totalAmount: totalAmount,
       totalCommission: totalCommission,
-      platformFee: 0,
+      platformFee: platformFee,
       status: "Pending",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

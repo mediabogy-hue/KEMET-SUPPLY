@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
@@ -73,7 +72,8 @@ export default function AdminOrdersPage() {
 
                 // 3. Update merchant's wallet (ONLY if merchant exists)
                 if (order.merchantId) {
-                    const merchantProfit = order.totalAmount - order.totalCommission - order.platformFee;
+                    const platformFee = order.platformFee || 0;
+                    const merchantProfit = order.totalAmount - order.totalCommission - platformFee;
                     const merchantWalletRef = doc(firestore, 'wallets', order.merchantId);
                     batch.update(merchantWalletRef, {
                         availableBalance: increment(merchantProfit),
@@ -236,5 +236,3 @@ export default function AdminOrdersPage() {
         </div>
     );
 }
-
-    
