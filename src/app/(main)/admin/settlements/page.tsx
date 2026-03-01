@@ -3,7 +3,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, runTransaction, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
 import type { Order } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,48 +17,22 @@ export default function SettlementsPage() {
     const { toast } = useToast();
     const [settlingOrderId, setSettlingOrderId] = useState<string | null>(null);
 
-    // Query 1: Efficiently get new orders ready for settlement (isSettled === false).
-    // This will require a composite index, which Firebase will prompt the user to create.
-    const newSettlementsQuery = useMemoFirebase(
+    // Fetch all delivered orders. This is a simple query that doesn't need a composite index.
+    const deliveredOrdersQuery = useMemoFirebase(
         () => (firestore ? query(
             collection(firestore, 'orders'),
-            where('status', '==', 'Delivered'),
-            where('isSettled', '==', false)
+            where('status', '==', 'Delivered')
         ) : null),
         [firestore]
     );
-    const { data: newOrders, isLoading: newLoading, error: newError } = useCollection<Order>(newSettlementsQuery);
+    const { data: deliveredOrders, isLoading, error } = useCollection<Order>(deliveredOrdersQuery);
 
-    // Query 2: Get a small batch of legacy orders (isSettled is undefined) to clear the backlog.
-    // This is less efficient and is capped to prevent performance issues.
-    const legacySettlementsQuery = useMemoFirebase(
-        () => (firestore ? query(
-            collection(firestore, 'orders'),
-            where('status', '==', 'Delivered'),
-            orderBy('createdAt', 'asc'), // Process oldest first to clear backlog
-            limit(50) // Process in batches of 50
-        ) : null),
-        [firestore]
-    );
-    const { data: legacyOrders, isLoading: legacyLoading, error: legacyError } = useCollection<Order>(legacySettlementsQuery);
-
-    // Combine and deduplicate results from both queries
+    // Filter for unsettled orders on the client side. This is more robust than a complex query.
     const orders = useMemo(() => {
-        // Filter legacy orders to only include those where `isSettled` is not defined.
-        const filteredLegacy = legacyOrders?.filter(order => order.isSettled === undefined) || [];
-        
-        // Combine the new, performant results with the filtered legacy results.
-        const allUnsettledOrders = [...(newOrders || []), ...filteredLegacy];
-        
-        // Deduplicate in case an order somehow appears in both lists.
-        const uniqueOrders = Array.from(new Map(allUnsettledOrders.map(order => [order.id, order])).values());
-        
-        return uniqueOrders;
-    }, [newOrders, legacyOrders]);
+        if (!deliveredOrders) return [];
+        return deliveredOrders.filter(order => order.isSettled !== true);
+    }, [deliveredOrders]);
 
-    const isLoading = newLoading || legacyLoading;
-    // Prioritize showing the index error if it exists, as it's the most critical one to solve.
-    const error = newError || legacyError;
     
     const handleSettleOrder = async (order: Order) => {
         if (!firestore) return;
@@ -91,7 +65,7 @@ export default function SettlementsPage() {
                     if (walletDoc.exists()) {
                         const currentBalance = Number(walletDoc.data()?.availableBalance);
                          if (isNaN(currentBalance)) {
-                            // Correct the corrupt data
+                            // Correct the corrupt data and update
                             transaction.update(walletRef, { availableBalance: orderDropshipperCommission, updatedAt: serverTimestamp() });
                         } else {
                             transaction.update(walletRef, { 
@@ -100,6 +74,7 @@ export default function SettlementsPage() {
                             });
                         }
                     } else {
+                        // Create a full, valid wallet if it doesn't exist
                         transaction.set(walletRef, {
                             id: dropshipperId,
                             availableBalance: orderDropshipperCommission,
@@ -135,6 +110,7 @@ export default function SettlementsPage() {
                                 });
                             }
                         } else {
+                            // Create a full, valid wallet if it doesn't exist
                             transaction.set(walletRef, {
                                 id: merchantId,
                                 availableBalance: merchantProfit,
