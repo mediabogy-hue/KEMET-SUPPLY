@@ -51,19 +51,21 @@ export default function AdminOrdersPage() {
 
         toast({ title: `جاري تحديث حالة الطلب إلى ${status}...` });
 
-        // The settlement logic is now moved to the settlements page.
-        // This function just updates the status.
         try {
             const orderRef = doc(firestore, 'orders', order.id);
             const updateData: any = { status, updatedAt: serverTimestamp() };
             if (status === 'Confirmed') updateData.confirmedAt = serverTimestamp();
             if (status === 'Shipped') updateData.shippedAt = serverTimestamp();
-            if (status === 'Delivered') updateData.deliveredAt = serverTimestamp();
             if (status === 'Returned') updateData.returnedAt = serverTimestamp();
             if (status === 'Canceled') updateData.canceledAt = serverTimestamp();
 
+            // If order is delivered, mark it as ready for settlement
+            if (status === 'Delivered') {
+                updateData.deliveredAt = serverTimestamp();
+                updateData.isSettled = false;
+            }
+
             await updateDoc(orderRef, updateData);
-            // No need to update local state, useCollection handles it
             toast({ title: 'تم تحديث الحالة بنجاح.' });
         } catch (e) {
             console.error('Failed to update order status:', e);

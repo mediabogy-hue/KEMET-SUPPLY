@@ -1,13 +1,14 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, doc, runTransaction, serverTimestamp, orderBy, limit } from 'firebase/firestore';
 import type { Order } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DataTable } from '@/app/(main)/admin/orders/_components/data-table';
+import { DataTable } from './_components/data-table';
 import { getColumns } from './_components/columns';
 
 
@@ -16,21 +17,48 @@ export default function SettlementsPage() {
     const { toast } = useToast();
     const [settlingOrderId, setSettlingOrderId] = useState<string | null>(null);
 
-    // Query for delivered orders, then filter client-side to avoid composite index
-    const deliveredOrdersQuery = useMemoFirebase(
+    // Query 1: Efficiently get new orders ready for settlement (isSettled === false).
+    // This will require a composite index, which Firebase will prompt the user to create.
+    const newSettlementsQuery = useMemoFirebase(
         () => (firestore ? query(
             collection(firestore, 'orders'),
-            where('status', '==', 'Delivered')
+            where('status', '==', 'Delivered'),
+            where('isSettled', '==', false)
         ) : null),
         [firestore]
     );
+    const { data: newOrders, isLoading: newLoading, error: newError } = useCollection<Order>(newSettlementsQuery);
 
-    const { data: deliveredOrders, isLoading, error } = useCollection<Order>(deliveredOrdersQuery);
+    // Query 2: Get a small batch of legacy orders (isSettled is undefined) to clear the backlog.
+    // This is less efficient and is capped to prevent performance issues.
+    const legacySettlementsQuery = useMemoFirebase(
+        () => (firestore ? query(
+            collection(firestore, 'orders'),
+            where('status', '==', 'Delivered'),
+            orderBy('createdAt', 'asc'), // Process oldest first to clear backlog
+            limit(50) // Process in batches of 50
+        ) : null),
+        [firestore]
+    );
+    const { data: legacyOrders, isLoading: legacyLoading, error: legacyError } = useCollection<Order>(legacySettlementsQuery);
 
+    // Combine and deduplicate results from both queries
     const orders = useMemo(() => {
-        if (!deliveredOrders) return [];
-        return deliveredOrders.filter(order => order.isSettled !== true);
-    }, [deliveredOrders]);
+        // Filter legacy orders to only include those where `isSettled` is not defined.
+        const filteredLegacy = legacyOrders?.filter(order => order.isSettled === undefined) || [];
+        
+        // Combine the new, performant results with the filtered legacy results.
+        const allUnsettledOrders = [...(newOrders || []), ...filteredLegacy];
+        
+        // Deduplicate in case an order somehow appears in both lists.
+        const uniqueOrders = Array.from(new Map(allUnsettledOrders.map(order => [order.id, order])).values());
+        
+        return uniqueOrders;
+    }, [newOrders, legacyOrders]);
+
+    const isLoading = newLoading || legacyLoading;
+    // Prioritize showing the index error if it exists, as it's the most critical one to solve.
+    const error = newError || legacyError;
     
     const handleSettleOrder = async (order: Order) => {
         if (!firestore) return;
@@ -40,32 +68,38 @@ export default function SettlementsPage() {
         try {
             await runTransaction(firestore, async (transaction) => {
                 const orderRef = doc(firestore, 'orders', order.id);
+                const orderDoc = await transaction.get(orderRef);
 
-                // --- Validation ---
-                const orderTotalAmount = Number(order.totalAmount || 0);
-                const orderDropshipperCommission = Number(order.totalCommission || 0);
-                const orderPlatformFee = Number(order.platformFee || 0);
-                if (isNaN(orderTotalAmount) || isNaN(orderDropshipperCommission) || isNaN(orderPlatformFee)) {
-                    throw new Error(`بيانات الطلب المالية غير صالحة.`);
+                if (!orderDoc.exists() || orderDoc.data().isSettled === true) {
+                    throw new Error(`الطلب #${order.id.substring(0,5)} تم تسويته بالفعل أو غير موجود.`);
                 }
 
-                // --- 1. Settle for Dropshipper ---
-                const dropshipperId = order.dropshipperId;
+                const orderData = orderDoc.data();
+                const orderTotalAmount = Number(orderData.totalAmount || 0);
+                const orderDropshipperCommission = Number(orderData.totalCommission || 0);
+                const orderPlatformFee = Number(orderData.platformFee || 0);
+
+                if (isNaN(orderTotalAmount) || isNaN(orderDropshipperCommission) || isNaN(orderPlatformFee)) {
+                    throw new Error(`البيانات المالية للطلب #${order.id.substring(0,7)} غير صالحة.`);
+                }
+                
+                const dropshipperId = orderData.dropshipperId;
                 if (typeof dropshipperId === 'string' && dropshipperId.trim() !== '' && orderDropshipperCommission > 0) {
                     const walletRef = doc(firestore, 'wallets', dropshipperId);
                     const walletDoc = await transaction.get(walletRef);
                     
                     if (walletDoc.exists()) {
-                        const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
-                        if (isNaN(currentBalance)) {
-                            throw new Error(`رصيد محفظة المسوق (${dropshipperId}) غير صالح.`);
+                        const currentBalance = Number(walletDoc.data()?.availableBalance);
+                         if (isNaN(currentBalance)) {
+                            // Correct the corrupt data
+                            transaction.update(walletRef, { availableBalance: orderDropshipperCommission, updatedAt: serverTimestamp() });
+                        } else {
+                            transaction.update(walletRef, { 
+                                availableBalance: currentBalance + orderDropshipperCommission,
+                                updatedAt: serverTimestamp() 
+                            });
                         }
-                        transaction.update(walletRef, { 
-                            availableBalance: currentBalance + orderDropshipperCommission,
-                            updatedAt: serverTimestamp() 
-                        });
                     } else {
-                        // Wallet does not exist, create it fully initialized
                         transaction.set(walletRef, {
                             id: dropshipperId,
                             availableBalance: orderDropshipperCommission,
@@ -77,28 +111,30 @@ export default function SettlementsPage() {
                     }
                 }
 
-                // --- 2. Settle for Merchant ---
-                const merchantId = order.merchantId;
+                const merchantId = orderData.merchantId;
                 if (typeof merchantId === 'string' && merchantId.trim() !== '') {
                     const merchantProfit = orderTotalAmount - orderDropshipperCommission - orderPlatformFee;
                     if (isNaN(merchantProfit)) {
-                        throw new Error(`فشل حساب ربح التاجر.`);
+                        throw new Error(`فشل حساب ربح التاجر للطلب #${order.id.substring(0,7)}.`);
+                    }
+                    if (merchantProfit < 0) {
+                        throw new Error(`ربح التاجر سالب (${merchantProfit.toFixed(2)}) للطلب #${order.id.substring(0,7)}. لن تتم التسوية.`);
                     }
                     if (merchantProfit > 0) {
                         const walletRef = doc(firestore, 'wallets', merchantId);
                         const walletDoc = await transaction.get(walletRef);
 
                         if (walletDoc.exists()) {
-                            const currentBalance = Number(walletDoc.data()?.availableBalance || 0);
+                            const currentBalance = Number(walletDoc.data()?.availableBalance);
                             if (isNaN(currentBalance)) {
-                               throw new Error(`رصيد محفظة التاجر (${merchantId}) غير صالح.`);
+                               transaction.update(walletRef, { availableBalance: merchantProfit, updatedAt: serverTimestamp() });
+                            } else {
+                                transaction.update(walletRef, { 
+                                    availableBalance: currentBalance + merchantProfit,
+                                    updatedAt: serverTimestamp() 
+                                });
                             }
-                            transaction.update(walletRef, { 
-                                availableBalance: currentBalance + merchantProfit,
-                                updatedAt: serverTimestamp() 
-                            });
                         } else {
-                            // Wallet does not exist, create it fully initialized
                             transaction.set(walletRef, {
                                 id: merchantId,
                                 availableBalance: merchantProfit,
@@ -108,12 +144,9 @@ export default function SettlementsPage() {
                                 updatedAt: serverTimestamp(),
                             });
                         }
-                    } else if (merchantProfit < 0) {
-                         throw new Error(`ربح التاجر سالب (${merchantProfit.toFixed(2)}).`);
                     }
                 }
                 
-                // --- 3. Mark order as settled ---
                 transaction.update(orderRef, { isSettled: true, updatedAt: serverTimestamp() });
             });
 
@@ -126,7 +159,7 @@ export default function SettlementsPage() {
              toast({
                 variant: 'destructive',
                 title: 'فشل إتمام التسوية المالية',
-                description: `للطلب #${order.id.substring(0, 7)}: ${e.message}`,
+                description: e.message,
                 duration: 10000,
             });
         } finally {
@@ -137,7 +170,29 @@ export default function SettlementsPage() {
     const columns = useMemo(() => getColumns(handleSettleOrder, settlingOrderId), [settlingOrderId]);
 
     if (error) {
-        return <p className="text-destructive">خطأ في تحميل الطلبات: {error.message}</p>;
+        return (
+          <div className="space-y-6">
+              <div>
+                  <h1 className="text-3xl font-bold tracking-tight">تسويات الأرباح</h1>
+                  <p className="text-muted-foreground">مراجعة وتوزيع أرباح الطلبات المكتملة على المسوقين والتجار.</p>
+              </div>
+              <Card>
+                <CardHeader>
+                    <CardTitle className="text-destructive">خطأ في تحميل البيانات</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-destructive">فشل تحميل الطلبات: {error.message}</p>
+                    {error.message.includes("The query requires an index") && (
+                        <div className="mt-4 p-4 border border-dashed border-destructive rounded-lg bg-destructive/10">
+                            <h3 className="font-semibold">إجراء مطلوب:</h3>
+                            <p>لتحسين أداء هذه الصفحة، يتطلب الأمر إضافة فهرس مخصص لقاعدة البيانات. هذا إجراء آمن ومطلوب لفرز البيانات بكفاءة.</p>
+                            <p className="mt-2">الرجاء فتح "أدوات المطورين" في متصفحك (Developer Tools)، والبحث في قسم "الكونسول" (Console) عن رسالة الخطأ التي تحتوي على رابط، ثم الضغط على هذا الرابط لإنشاء الفهرس المطلوب.</p>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+          </div>
+        );
     }
     
     return (
