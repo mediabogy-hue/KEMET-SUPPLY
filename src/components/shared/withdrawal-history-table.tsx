@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,6 +28,22 @@ export function WithdrawalHistoryTable({ requests, isLoading }: WithdrawalHistor
         return <p className="text-center py-8 text-muted-foreground">لم تقم بأي طلبات سحب بعد.</p>
     }
 
+    const formatDate = (date: any): string => {
+        if (!date) {
+            return 'N/A';
+        }
+        // Firestore Timestamps have a toDate() method.
+        // Other values might be JS Date objects or ISO strings.
+        const dateObj = typeof date.toDate === 'function' ? date.toDate() : new Date(date);
+        
+        // Check if the created date is valid
+        if (isNaN(dateObj.getTime())) {
+            return 'تاريخ غير صالح';
+        }
+
+        return format(dateObj, "yyyy-MM-dd");
+    };
+
     return (
         <div className="rounded-md border">
             <Table>
@@ -51,7 +68,7 @@ export function WithdrawalHistoryTable({ requests, isLoading }: WithdrawalHistor
                             <TableCell>
                                 <WithdrawalStatusBadge status={request.status} />
                             </TableCell>
-                            <TableCell>{request.createdAt?.toDate ? format(request.createdAt.toDate(), "yyyy-MM-dd") : 'N/A'}</TableCell>
+                            <TableCell>{formatDate(request.createdAt)}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
