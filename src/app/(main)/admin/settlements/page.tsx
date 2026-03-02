@@ -57,11 +57,11 @@ export default function SettlementsPage() {
                 // 2. DEFINE all financial values from the FRESH, RELIABLE order data, RECALCULATING based on fixed percentages.
                 const orderTotalAmount = Number(freshOrderData.totalAmount || 0);
                 
-                // --- FIXED CALCULATION ---
+                // --- RIGOROUS RECALCULATION ---
                 const dropshipperCommission = orderTotalAmount * 0.0125;
                 const platformFee = orderTotalAmount * 0.05;
                 const merchantProfit = orderTotalAmount - dropshipperCommission - platformFee;
-                // --- END OF FIXED CALCULATION ---
+                // --- END OF RECALCULATION ---
 
                 const dropshipperId = freshOrderData.dropshipperId;
                 const merchantId = freshOrderData.merchantId;
