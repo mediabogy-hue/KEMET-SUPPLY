@@ -1,0 +1,139 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Check role from the user's profile document
+    function isRole(role) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+    
+    function isAdmin() {
+      return isRole('Admin');
+    }
+    
+    function isOrdersManager() {
+      return isRole('OrdersManager');
+    }
+
+    function isFinanceManager() {
+      return isRole('FinanceManager');
+    }
+    
+    function isMerchant() {
+      return isRole('Merchant');
+    }
+
+    function isStaff() {
+      return isAdmin() || isOrdersManager() || isFinanceManager();
+    }
+
+    // Default-deny all reads and writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // User profiles
+    // A user can always read their own profile. Staff can read any profile.
+    match /users/{userId} {
+      allow create: if isOwner(userId);
+      allow get: if isOwner(userId) || isStaff();
+      allow update: if isOwner(userId) || isAdmin();
+      allow list, delete: if isAdmin();
+    }
+    
+    // Wallets
+    match /wallets/{userId} {
+        allow get: if isOwner(userId) || isFinanceManager() || isAdmin();
+        // Create/Update is done by staff when processing withdrawals or settling orders.
+        // This allows creating a wallet on-the-fly if it's missing.
+        allow create, update: if isStaff();
+    }
+    
+    // Public Settings
+    match /publicSettings/{docId} {
+        allow get: if true;
+        allow write: if isAdmin();
+    }
+
+    // Products and Categories
+    match /products/{productId} {
+        allow read: if true;
+        allow create: if isAdmin() || isMerchant();
+        // Merchant can only update their own products. Admin can update any.
+        allow update: if isAdmin() || (isMerchant() && resource.data.merchantId == request.auth.uid);
+        allow delete: if isAdmin() || (isMerchant() && resource.data.merchantId == request.auth.uid);
+    }
+    match /productCategories/{categoryId} {
+        allow read: if true;
+        allow create, update, delete: if isAdmin();
+    }
+     // Anyone can track a product click via the public page
+    match /products/{productId}/clicks/{clickId} {
+        allow create: if true;
+        allow read, list, update, delete: if false;
+    }
+    
+    // Orders
+    match /orders/{orderId} {
+      allow create: if (isSignedIn() && request.resource.data.dropshipperId == request.auth.uid) || request.auth == null;
+      allow list: if isSignedIn(); // Allow list queries for all signed-in users
+      allow get: if isSignedIn() && (
+        resource.data.dropshipperId == request.auth.uid || 
+        isStaff() ||
+        (isMerchant() && resource.data.merchantId == request.auth.uid)
+      );
+      // Order manager/Admin can update anything. Merchant can update their own orders.
+      allow update: if isOrdersManager() || isAdmin() || (isMerchant() && resource.data.merchantId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // Withdrawal requests
+    match /adminWithdrawalRequests/{reqId} {
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+        allow read, list, update, delete: if isFinanceManager() || isAdmin();
+    }
+    match /users/{userId}/withdrawalRequests/{reqId} {
+        allow create: if isOwner(userId);
+        allow read, list: if isOwner(userId);
+        allow update, delete: if isFinanceManager() || isAdmin();
+    }
+    
+    // Merchant Inquiries can be created by anyone.
+    match /merchantInquiries/{inquiryId} {
+        allow create: if true;
+        allow read, list, update, delete: if isAdmin();
+    }
+    
+     // Marketing customers can be created by anyone who successfully refers them
+    match /marketingCustomers/{contactId} {
+      allow create, update: if true;
+      allow read, list, delete: if isAdmin();
+    }
+
+    // Stock Ledger
+    match /stockLedger/{ledgerId} {
+        allow read, list: if isAdmin();
+        allow create: if isAdmin() || isMerchant();
+        allow update, delete: if false;
+    }
+
+    // Helper collections
+    match /id_generator/{docId} {
+        allow create: if isSignedIn() || request.auth == null;
+    }
+    match /webhooks_bosta/{webhookId} {
+        allow create: if true; // Webhooks can write
+        allow read, list, update, delete: if isAdmin();
+    }
+  }
+}

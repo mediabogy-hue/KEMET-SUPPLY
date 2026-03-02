@@ -2,7 +2,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, where, doc, writeBatch, serverTimestamp, increment } from 'firebase/firestore';
+import { collection, query, orderBy, where, doc, writeBatch, serverTimestamp, increment, runTransaction } from 'firebase/firestore';
 import type { WithdrawalRequest, Wallet } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { KpiCard } from './_components/kpi-card';
@@ -55,37 +55,55 @@ export default function AdminWithdrawalsPage() {
         }
 
         toast({ title: 'جاري تحديث حالة الطلب...' });
-        
-        try {
-            const batch = writeBatch(firestore);
 
+        if (newStatus === 'Rejected') {
+            const batch = writeBatch(firestore);
             const adminReqRef = doc(firestore, 'adminWithdrawalRequests', request.id);
             const userReqRef = doc(firestore, `users/${request.userId}/withdrawalRequests`, request.id);
-            const walletRef = doc(firestore, 'wallets', request.userId);
-
-            batch.update(adminReqRef, { status: newStatus, updatedAt: serverTimestamp() });
-            batch.update(userReqRef, { status: newStatus, updatedAt: serverTimestamp() });
-
-            if (newStatus === 'Completed') {
-                batch.update(walletRef, {
-                    pendingWithdrawals: increment(-request.amount),
-                    totalWithdrawn: increment(request.amount),
-                    updatedAt: serverTimestamp()
-                });
-            } else if (newStatus === 'Rejected') {
-                batch.update(walletRef, {
-                    pendingWithdrawals: increment(-request.amount),
-                    availableBalance: increment(request.amount),
-                    updatedAt: serverTimestamp()
-                });
+            batch.update(adminReqRef, { status: 'Rejected', updatedAt: serverTimestamp() });
+            batch.update(userReqRef, { status: 'Rejected', updatedAt: serverTimestamp() });
+            try {
+                await batch.commit();
+                toast({ title: 'تم رفض طلب السحب.' });
+            } catch (e) {
+                console.error("Failed to reject withdrawal:", e);
+                toast({ variant: 'destructive', title: 'فشل تحديث الحالة' });
             }
+            return;
+        }
 
-            await batch.commit();
-            toast({ title: 'تم تحديث الحالة بنجاح' });
+        if (newStatus === 'Completed') {
+            try {
+                await runTransaction(firestore, async (transaction) => {
+                    const walletRef = doc(firestore, 'wallets', request.userId);
+                    const walletDoc = await transaction.get(walletRef);
 
-        } catch (e) {
-            console.error("Failed to update withdrawal status:", e);
-            toast({ variant: 'destructive', title: 'فشل تحديث الحالة' });
+                    if (!walletDoc.exists()) {
+                        throw new Error("محفظة المستخدم غير موجودة.");
+                    }
+
+                    const currentBalance = walletDoc.data().availableBalance || 0;
+                    if (currentBalance < request.amount) {
+                        throw new Error("الرصيد المتاح للمستخدم غير كافٍ لإتمام عملية السحب.");
+                    }
+
+                    transaction.update(walletRef, {
+                        availableBalance: increment(-request.amount),
+                        totalWithdrawn: increment(request.amount),
+                        updatedAt: serverTimestamp()
+                    });
+
+                    const adminReqRef = doc(firestore, 'adminWithdrawalRequests', request.id);
+                    const userReqRef = doc(firestore, `users/${request.userId}/withdrawalRequests`, request.id);
+                    transaction.update(adminReqRef, { status: 'Completed', updatedAt: serverTimestamp() });
+                    transaction.update(userReqRef, { status: 'Completed', updatedAt: serverTimestamp() });
+                });
+
+                toast({ title: 'تم اعتماد السحب وإتمام العملية بنجاح!' });
+            } catch (e: any) {
+                console.error("Failed to complete withdrawal transaction:", e);
+                toast({ variant: 'destructive', title: 'فشل إتمام السحب', description: e.message });
+            }
         }
     };
 
@@ -101,15 +119,7 @@ export default function AdminWithdrawalsPage() {
         batch.delete(adminReqRef);
         batch.delete(userReqRef);
 
-        // If the request was pending, we must refund the user.
-        if (requestToDelete.status === 'Pending') {
-            const walletRef = doc(firestore, 'wallets', requestToDelete.userId);
-            batch.update(walletRef, {
-                pendingWithdrawals: increment(-requestToDelete.amount),
-                availableBalance: increment(requestToDelete.amount),
-                updatedAt: serverTimestamp()
-            });
-        }
+        // No wallet update is needed because no money was held in 'pending' status.
         
         try {
             await batch.commit();

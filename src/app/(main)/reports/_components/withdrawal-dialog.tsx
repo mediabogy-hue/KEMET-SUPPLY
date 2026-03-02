@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/firebase";
+import { useFirestore } from "@/firebase";
+import { collection, doc, writeBatch, serverTimestamp } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { useSession } from "@/auth/SessionProvider";
 
@@ -41,7 +42,7 @@ interface WithdrawalDialogProps {
 
 export function WithdrawalDialog({ availableBalance, userProfile }: WithdrawalDialogProps) {
   const { user } = useSession();
-  const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -63,7 +64,7 @@ export function WithdrawalDialog({ availableBalance, userProfile }: WithdrawalDi
   });
 
   const onSubmit = async (data: WithdrawalFormData) => {
-    if (!user || !userProfile || !auth) {
+    if (!user || !userProfile || !firestore) {
       toast({ variant: "destructive", title: "خطأ", description: "المستخدم غير موجود أو المصادقة فشلت." });
       return;
     }
@@ -94,25 +95,31 @@ export function WithdrawalDialog({ availableBalance, userProfile }: WithdrawalDi
     }
     
     try {
-        const token = await user.getIdToken();
-        const response = await fetch('/api/wallet/withdraw', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({
-                amount: data.amount,
-                method: data.method,
-                paymentIdentifier: paymentIdentifier
-            })
-        });
+        const batch = writeBatch(firestore);
+        const newId = doc(collection(firestore, 'id_generator')).id;
 
-        const result = await response.json();
+        const userWithdrawalRef = doc(firestore, `users/${user.uid}/withdrawalRequests`, newId);
+        const adminWithdrawalRef = doc(firestore, `adminWithdrawalRequests`, newId);
 
-        if (!response.ok) {
-            throw new Error(result.error || 'فشل إرسال الطلب');
-        }
+        const withdrawalData = {
+          id: newId,
+          userId: user.uid,
+          userName: `${userProfile.firstName} ${userProfile.lastName}`.trim(),
+          amount: data.amount,
+          method: data.method,
+          paymentIdentifier: paymentIdentifier,
+          status: "Pending" as const,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+
+        // Write to both locations
+        batch.set(userWithdrawalRef, withdrawalData);
+        batch.set(adminWithdrawalRef, withdrawalData);
+
+        // No wallet update needed here. Admin will do it upon approval.
+
+        await batch.commit();
 
         toast({ title: "تم إرسال طلب السحب بنجاح!" });
         reset();
