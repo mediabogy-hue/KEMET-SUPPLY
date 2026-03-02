@@ -1,11 +1,6 @@
 'use client';
 
 import { useMemo, type DependencyList } from 'react';
-import type { Auth } from 'firebase/auth';
-import type { FirebaseApp } from 'firebase/app';
-import type { Firestore } from 'firebase/firestore';
-import type { Storage } from 'firebase/storage';
-import { useFirebase } from './provider';
 
 // Explicitly re-export from other modules
 import { useCollection } from './firestore/use-collection';
@@ -18,6 +13,9 @@ import { FirestorePermissionError } from './errors';
 import { errorEmitter } from './error-emitter';
 import type { AppEvents } from './error-emitter';
 import { useUser } from './auth/use-user';
+
+// Re-export provider hooks from the provider file itself to avoid cycles
+import { useFirebase, useAuth, useFirestore, useStorage, useFirebaseApp } from './provider';
 
 // Export types
 export type {
@@ -41,17 +39,14 @@ export {
   FirestorePermissionError,
   errorEmitter,
   useUser,
+  // Re-export the provider hooks
+  useFirebase,
+  useAuth,
+  useFirestore,
+  useStorage,
+  useFirebaseApp
 };
 
-
-// Re-export useFirebase from provider
-export { useFirebase };
-
-// These hooks are safe to export from a barrel file.
-export const useAuth = (): Auth => useFirebase().auth;
-export const useFirestore = (): Firestore => useFirebase().firestore;
-export const useStorage = (): Storage => useFirebase().storage;
-export const useFirebaseApp = (): FirebaseApp => useFirebase().firebaseApp;
 
 type MemoFirebase <T> = T & {__memo?: boolean};
 

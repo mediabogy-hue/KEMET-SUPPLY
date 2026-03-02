@@ -31,7 +31,6 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Define and export useFirebase hook from here
 export const useFirebase = (): FirebaseContextState => {
   const context = useContext(FirebaseContext);
   if (context === undefined) {
@@ -39,3 +38,9 @@ export const useFirebase = (): FirebaseContextState => {
   }
   return context;
 };
+
+// Define and export main hooks from here to avoid circular dependencies with the barrel file.
+export const useAuth = (): Auth => useFirebase().auth;
+export const useFirestore = (): Firestore => useFirebase().firestore;
+export const useStorage = (): Storage => useFirebase().storage;
+export const useFirebaseApp = (): FirebaseApp => useFirebase().firebaseApp;
