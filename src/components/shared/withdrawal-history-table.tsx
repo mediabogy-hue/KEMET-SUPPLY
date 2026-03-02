@@ -51,7 +51,7 @@ export function WithdrawalHistoryTable({ requests, isLoading }: WithdrawalHistor
                             <TableCell>
                                 <WithdrawalStatusBadge status={request.status} />
                             </TableCell>
-                            <TableCell>{format(request.createdAt.toDate(), "yyyy-MM-dd")}</TableCell>
+                            <TableCell>{request.createdAt && typeof request.createdAt.toDate === 'function' ? format(request.createdAt.toDate(), "yyyy-MM-dd") : 'N/A'}</TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
