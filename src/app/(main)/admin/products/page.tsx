@@ -169,17 +169,6 @@ export default function AdminProductsPage() {
                                                 <DropdownMenuItem onClick={() => setProductToUpdateStock(product)}><Package className="me-2"/> تحديث المخزون</DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setProductToAnalyze(product)}>تحليلات</DropdownMenuItem>
                                                 <DropdownMenuSeparator />
-                                                {product.approvalStatus !== 'Approved' && (
-                                                    <DropdownMenuItem onClick={() => handleApproval(product, 'Approved')}>
-                                                        <Check className="me-2 text-green-500"/> قبول المنتج
-                                                    </DropdownMenuItem>
-                                                )}
-                                                {product.approvalStatus !== 'Rejected' && (
-                                                    <DropdownMenuItem onClick={() => handleApproval(product, 'Rejected')} className="text-destructive">
-                                                        <X className="me-2"/> رفض المنتج
-                                                    </DropdownMenuItem>
-                                                )}
-                                                <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive"><Trash2 className="me-2"/> حذف المنتج</DropdownMenuItem>
                                             </DropdownMenuContent>
                                         </DropdownMenu>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useRef } from "react";
@@ -127,7 +126,7 @@ export function AddProductDialog() {
           id: productId, name, category, description,
           price: priceNumber, commission: commissionNumber, stockQuantity: quantityNumber,
           isAvailable: quantityNumber > 0,
-          approvalStatus: profile?.role === 'Merchant' ? 'Pending' : 'Approved',
+          approvalStatus: 'Approved',
           imageUrls: finalImageUrls, 
           videoUrl: finalVideoUrl || null,
           purchaseUrl: purchaseUrl || null,
