@@ -68,7 +68,7 @@ export default function AdminProductsPage() {
         try {
             await updateDoc(productRef, {
                 approvalStatus: newStatus,
-                isAvailable: isApproving, // Make available on approval, unavailable on rejection
+                isAvailable: isApproving && product.stockQuantity > 0, // Make available only on approval AND if stock exists
                 updatedAt: serverTimestamp(),
             });
             toast({ title: `تم ${isApproving ? 'قبول' : 'رفض'} المنتج بنجاح` });

@@ -126,8 +126,8 @@ export function AddProductDialog() {
         const newProductData: Omit<Product, 'createdAt' | 'updatedAt' | 'isAvailable'> & { createdAt: any, updatedAt: any, isAvailable: boolean } = {
           id: productId, name, category, description,
           price: priceNumber, commission: commissionNumber, stockQuantity: quantityNumber,
-          isAvailable: false,
-          approvalStatus: 'Pending',
+          isAvailable: quantityNumber > 0,
+          approvalStatus: 'Approved',
           imageUrls: finalImageUrls, 
           videoUrl: finalVideoUrl || null,
           purchaseUrl: purchaseUrl || null,
@@ -141,7 +141,7 @@ export function AddProductDialog() {
 
         updateToast({
           title: "✅ تم إضافة المنتج بنجاح!",
-          description: `${name} الآن قيد المراجعة.`,
+          description: `${name} الآن متاح للتسويق.`,
           duration: 5000,
         });
 
@@ -175,7 +175,7 @@ export function AddProductDialog() {
         <DialogHeader>
           <DialogTitle>إضافة منتج جديد</DialogTitle>
           <DialogDescription>
-            سيخضع المنتج للمراجعة من قبل الإدارة قبل عرضه للمسوقين.
+            سيظهر المنتج للمسوقين فور إضافته.
           </DialogDescription>
         </DialogHeader>
         
