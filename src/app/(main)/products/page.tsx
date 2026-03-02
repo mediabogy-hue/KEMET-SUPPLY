@@ -18,9 +18,15 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // Fetch only available products for better performance
+    // Fetch only available AND approved products for better performance and consistency.
     const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'products'), where('isAvailable', '==', true)) : null),
+        () => (firestore 
+            ? query(
+                collection(firestore, 'products'), 
+                where('isAvailable', '==', true),
+                where('approvalStatus', '==', 'Approved')
+              ) 
+            : null),
         [firestore]
     );
     const { data: products, isLoading: productsLoading, error } = useCollection<Product>(productsQuery);
@@ -31,8 +37,9 @@ export default function ProductsPage() {
             toast({
                 variant: 'destructive',
                 title: 'فشل تحميل المنتجات',
-                description: error.message,
+                description: 'قد يتطلب الأمر إنشاء فهرس في قاعدة البيانات. يرجى المحاولة مرة أخرى بعد قليل.',
             });
+            console.error("Product query error:", error);
         }
     }, [error, toast]);
 
@@ -41,7 +48,7 @@ export default function ProductsPage() {
         if (!products) return [];
         
         let processedProducts = products
-            // isAvailable filter is now done in the query
+            // isAvailable and approvalStatus are now filtered in the query
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
             
