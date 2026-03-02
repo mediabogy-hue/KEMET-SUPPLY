@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, doc, runTransaction, serverTimestamp, increment, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, doc, runTransaction, serverTimestamp, increment, orderBy, limit, DocumentReference, DocumentSnapshot } from 'firebase/firestore';
 import type { Order } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,37 +41,59 @@ export default function SettlementsPage() {
         setSettlingOrderId(order.id);
 
         try {
+            // === Start of Firestore Transaction ===
             await runTransaction(firestore, async (transaction) => {
+                // 1. READ the order document first. This is mandatory for any transaction.
                 const orderRef = doc(firestore, 'orders', order.id);
                 const freshOrderDoc = await transaction.get(orderRef);
 
                 if (!freshOrderDoc.exists() || freshOrderDoc.data().isSettled === true) {
-                    throw new Error(`تمت تسوية الطلب #${order.id.substring(0,5)} بالفعل.`);
+                    throw new Error(`تمت تسوية هذا الطلب بالفعل أو لم يعد موجودًا.`);
                 }
                 
-                // CRITICAL FIX: Use data from the fresh document read within the transaction
                 const freshOrderData = freshOrderDoc.data() as Order;
-                
+
+                // 2. DEFINE all financial values from the FRESH, RELIABLE order data.
                 const orderTotalAmount = Number(freshOrderData.totalAmount || 0);
                 const dropshipperCommission = Number(freshOrderData.totalCommission || 0);
                 const platformFee = Number(freshOrderData.platformFee || 0);
+                // THE CORRECT and FINAL calculation for merchant profit.
+                const merchantProfit = orderTotalAmount - dropshipperCommission - platformFee;
 
-                // 1. Mark order as settled
-                transaction.update(orderRef, { isSettled: true, settledAt: serverTimestamp(), updatedAt: serverTimestamp() });
-
-                // 2. Settle dropshipper commission (robustly)
                 const dropshipperId = freshOrderData.dropshipperId;
-                if (dropshipperId && dropshipperCommission > 0) {
-                    const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
-                    const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
+                const merchantId = freshOrderData.merchantId;
 
+                // 3. READ all wallet documents that will be written to. This is a transaction requirement.
+                const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
+                const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
+
+                let merchantWalletRef: DocumentReference | null = null;
+                let merchantWalletDoc: DocumentSnapshot | null = null;
+                // Only proceed with merchant if the ID is valid.
+                if (merchantId && typeof merchantId === 'string' && merchantId.length > 0) {
+                    merchantWalletRef = doc(firestore, 'wallets', merchantId);
+                    merchantWalletDoc = await transaction.get(merchantWalletRef);
+                }
+
+                // 4. PERFORM ALL WRITES.
+                // All reads are complete. Now we can safely perform all write operations.
+
+                // A. Update the order to mark it as settled.
+                transaction.update(orderRef, { 
+                    isSettled: true, 
+                    settledAt: serverTimestamp(),
+                    updatedAt: serverTimestamp() 
+                });
+
+                // B. Settle dropshipper commission robustly.
+                if (dropshipperCommission > 0) {
                     if (dropshipperWalletDoc.exists()) {
                         transaction.update(dropshipperWalletRef, { 
                             availableBalance: increment(dropshipperCommission),
                             updatedAt: serverTimestamp() 
                         });
                     } else {
-                        // Create wallet if it doesn't exist
+                        // Create a new, complete wallet if it doesn't exist
                         transaction.set(dropshipperWalletRef, {
                             id: dropshipperId,
                             availableBalance: dropshipperCommission,
@@ -83,35 +105,27 @@ export default function SettlementsPage() {
                     }
                 }
 
-                // 3. Settle merchant profit (robustly)
-                const merchantId = freshOrderData.merchantId;
-                // Defensive check: Ensure merchantId is a valid non-empty string.
-                if (merchantId && typeof merchantId === 'string' && merchantId.length > 0) {
-                    const merchantProfit = orderTotalAmount - dropshipperCommission - platformFee;
-                    
-                    if (merchantProfit > 0) {
-                        const merchantWalletRef = doc(firestore, 'wallets', merchantId);
-                        const merchantWalletDoc = await transaction.get(merchantWalletRef);
-                        
-                        if (merchantWalletDoc.exists()) {
-                             transaction.update(merchantWalletRef, { 
-                                availableBalance: increment(merchantProfit),
-                                updatedAt: serverTimestamp() 
-                            });
-                        } else {
-                            // Create wallet if it doesn't exist
-                            transaction.set(merchantWalletRef, {
-                                id: merchantId,
-                                availableBalance: merchantProfit,
-                                pendingBalance: 0,
-                                pendingWithdrawals: 0,
-                                totalWithdrawn: 0,
-                                updatedAt: serverTimestamp(),
-                            });
-                        }
+                // C. Settle merchant profit robustly.
+                if (merchantWalletRef && merchantProfit > 0) {
+                     if (merchantWalletDoc && merchantWalletDoc.exists()) {
+                        transaction.update(merchantWalletRef, { 
+                            availableBalance: increment(merchantProfit),
+                            updatedAt: serverTimestamp() 
+                        });
+                    } else {
+                        // Create a new, complete wallet if it doesn't exist
+                        transaction.set(merchantWalletRef, {
+                            id: merchantId!,
+                            availableBalance: merchantProfit,
+                            pendingBalance: 0,
+                            pendingWithdrawals: 0,
+                            totalWithdrawn: 0,
+                            updatedAt: serverTimestamp(),
+                        });
                     }
                 }
             });
+            // === End of Firestore Transaction ===
 
             toast({
                 title: '🎉 تمت التسوية بنجاح!',
