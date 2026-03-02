@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -66,8 +65,7 @@ export default function RegisterPage() {
       const userDocRef = doc(firestore, 'users', newUser.uid);
       const walletDocRef = doc(firestore, 'wallets', newUser.uid);
       
-      // Make the newly registered user an Admin to bootstrap the app
-      const userRole: UserProfile['role'] = 'Admin';
+      const userRole: UserProfile['role'] = 'Dropshipper';
 
       const newUserProfile: Omit<UserProfile, 'createdAt' | 'updatedAt'> = {
         id: newUser.uid,
@@ -101,8 +99,8 @@ export default function RegisterPage() {
       await batch.commit();
       
       toast({
-        title: 'تم إنشاء الحساب بنجاح!',
-        description: 'مرحباً بك. تم منحك صلاحيات المدير (Admin). سيتم توجيهك الآن.',
+        title: 'تم إنشاء حسابك بنجاح!',
+        description: 'مرحباً بك في Kemet Supply. سيتم توجيهك الآن إلى لوحة التحكم.',
       });
       // The SessionProvider will automatically redirect the user to their dashboard.
 
