@@ -56,7 +56,9 @@ export const getColumns = (
     header: "تاريخ التوصيل",
     cell: ({ row }) => {
         const date = row.original.deliveredAt;
-        return date ? new Date(date).toLocaleDateString('ar-EG') : 'غير محدد';
+        if (!date) return 'غير محدد';
+        const d = (date as any).toDate ? (date as any).toDate() : new Date(date as string);
+        return d.toLocaleDateString('ar-EG');
     }
   },
   {
