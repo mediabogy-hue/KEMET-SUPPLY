@@ -1,5 +1,5 @@
-
 'use client';
+import { useEffect } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
@@ -8,6 +8,7 @@ import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useMemo } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface CategoryBrowserProps {
@@ -17,13 +18,26 @@ interface CategoryBrowserProps {
 
 export function CategoryBrowser({ selectedCategory, onSelectCategory }: CategoryBrowserProps) {
     const firestore = useFirestore();
+    const { toast } = useToast();
     
     // Fetch only available categories directly from Firestore
     const categoriesQuery = useMemoFirebase(
         () => (firestore ? query(collection(firestore, "productCategories"), where("isAvailable", "==", true)) : null),
         [firestore]
     );
-    const { data: categories, isLoading } = useCollection<ProductCategory>(categoriesQuery);
+    const { data: categories, isLoading, error } = useCollection<ProductCategory>(categoriesQuery);
+
+    useEffect(() => {
+        if (error) {
+            toast({
+                variant: "destructive",
+                title: "فشل تحميل الفئات",
+                description: "قد تكون هناك مشكلة في صلاحيات الوصول إلى البيانات.",
+            });
+            console.error("Category fetch error:", error);
+        }
+    }, [error, toast]);
+
 
     // Categories are now pre-filtered by the query, just need to sort them.
     const sortedCategories = useMemo(() => {

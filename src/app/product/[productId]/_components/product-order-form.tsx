@@ -82,13 +82,9 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
         }
 
         try {
-            const dropshipperRef = doc(firestore, 'users', refId);
-            const dropshipperSnap = await getDoc(dropshipperRef);
-            if (!dropshipperSnap.exists()) {
-                throw new Error("المسوق غير موجود.");
-            }
-            const dropshipper = dropshipperSnap.data() as UserProfile;
-            const dropshipperName = `${dropshipper.firstName} ${dropshipper.lastName}`.trim();
+            // We can't fetch the dropshipper's name here due to security rules (public users can't read profiles).
+            // We'll use a generic placeholder. The name can be looked up by admins later using the refId.
+            const dropshipperName = "المسوق بالعمولة";
 
             const batch = writeBatch(firestore);
             const orderId = doc(collection(firestore, 'id_generator')).id;
