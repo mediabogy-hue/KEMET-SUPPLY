@@ -67,7 +67,12 @@
         "id": { "type": "string" },
         "name": { "type": "string" },
         "description": { "type": "string" },
-        "merchantId": { "type": "string", "description": "The ID of the Merchant who owns this product." }
+        "merchantId": { "type": "string", "description": "The ID of the Merchant who owns this product." },
+        "approvalStatus": {
+            "type": "string",
+            "description": "The approval status of the product.",
+            "enum": ["Pending", "Approved", "Rejected"]
+        }
       }
     },
     "Order": {

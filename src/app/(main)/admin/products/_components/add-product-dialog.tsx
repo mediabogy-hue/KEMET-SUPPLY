@@ -16,13 +16,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useFirestore, useCollection, useMemoFirebase, useStorage } from "@/firebase";
 import { useSession } from "@/auth/SessionProvider";
 import { collection, doc, setDoc, serverTimestamp, query, orderBy } from "firebase/firestore";
 import type { Product, ProductCategory } from "@/lib/types";
-import { PlusCircle, Upload, Loader2 } from "lucide-react";
+import { PlusCircle, Upload } from "lucide-react";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { compressImage } from "@/lib/utils";
 import Image from "next/image";
@@ -53,7 +52,6 @@ export function AddProductDialog() {
   const [commission, setCommission] = useState("");
   const [stockQuantity, setStockQuantity] = useState("");
   const [purchaseUrl, setPurchaseUrl] = useState("");
-  const [isAvailable, setIsAvailable] = useState(true);
   
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imageUrlLinksInput, setImageUrlLinksInput] = useState("");
@@ -71,7 +69,6 @@ export function AddProductDialog() {
       setCommission("");
       setStockQuantity("");
       setPurchaseUrl("");
-      setIsAvailable(true);
       setImageFiles([]);
       setImageUrlLinksInput("");
       setVideoUrlInput("");
@@ -126,10 +123,12 @@ export function AddProductDialog() {
         
         const productDocRef = doc(firestore, "products", productId);
         
-        const newProductData = {
+        const newProductData: Omit<Product, 'createdAt' | 'updatedAt' | 'isAvailable'> & { createdAt: any, updatedAt: any, isAvailable: boolean } = {
           id: productId, name, category, description,
           price: priceNumber, commission: commissionNumber, stockQuantity: quantityNumber,
-          isAvailable, imageUrls: finalImageUrls, 
+          isAvailable: false,
+          approvalStatus: 'Pending',
+          imageUrls: finalImageUrls, 
           videoUrl: finalVideoUrl || null,
           purchaseUrl: purchaseUrl || null,
           merchantId: profile?.role === 'Merchant' ? user.uid : null,
@@ -142,7 +141,7 @@ export function AddProductDialog() {
 
         updateToast({
           title: "✅ تم إضافة المنتج بنجاح!",
-          description: name,
+          description: `${name} الآن قيد المراجعة.`,
           duration: 5000,
         });
 
@@ -176,7 +175,7 @@ export function AddProductDialog() {
         <DialogHeader>
           <DialogTitle>إضافة منتج جديد</DialogTitle>
           <DialogDescription>
-            املأ الحقول يدوياً، ارفع صوراً، أو أضف روابط للصور والفيديو.
+            سيخضع المنتج للمراجعة من قبل الإدارة قبل عرضه للمسوقين.
           </DialogDescription>
         </DialogHeader>
         
@@ -211,7 +210,7 @@ export function AddProductDialog() {
                     <Input id="price" type="number" placeholder="99.99" value={price} onChange={(e) => setPrice(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="commission">العمولة (ج.م)</Label>
+                    <Label htmlFor="commission">عمولة المسوق (ج.م)</Label>
                     <Input id="commission" type="number" placeholder="10.00" value={commission} onChange={(e) => setCommission(e.target.value)} />
                   </div>
               </div>
@@ -251,13 +250,6 @@ export function AddProductDialog() {
               <div className="space-y-2">
                 <Label htmlFor="purchaseUrl">رابط الشراء من المورد (اختياري)</Label>
                 <Input id="purchaseUrl" placeholder="https://supplier.com/product" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} />
-              </div>
-               <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                 <div className="space-y-0.5">
-                    <Label htmlFor="isAvailable">الحالة</Label>
-                    <p className="text-xs text-muted-foreground">إلغاء التفعيل سيخفي المنتج من المتجر.</p>
-                </div>
-                <Switch id="isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable} />
               </div>
             </div>
         </div>

@@ -61,7 +61,7 @@ export function ProductOrderForm({ product, refId }: ProductOrderFormProps) {
     const quantity = watch('quantity');
     const paymentMethod = watch('customerPaymentMethod');
     const totalAmount = product.price * quantity;
-    const unitCommission = product.price * 0.0125;
+    const unitCommission = product.commission;
     const totalCommission = unitCommission * quantity;
     const platformFee = totalAmount * 0.05;
 

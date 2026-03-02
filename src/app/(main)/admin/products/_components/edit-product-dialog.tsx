@@ -58,6 +58,8 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
   const [stockQuantity, setStockQuantity] = useState("");
   const [purchaseUrl, setPurchaseUrl] = useState("");
   const [isAvailable, setIsAvailable] = useState(true);
+  const [approvalStatus, setApprovalStatus] = useState<'Pending' | 'Approved' | 'Rejected'>('Pending');
+
 
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [videoUrlInput, setVideoUrlInput] = useState("");
@@ -85,6 +87,7 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
         setVideoUrlInput(product.videoUrl || "");
         setPurchaseUrl(product.purchaseUrl || "");
         setIsAvailable(product.isAvailable);
+        setApprovalStatus(product.approvalStatus || 'Pending');
     } else if (!isOpen) {
         resetForm();
     }
@@ -132,6 +135,7 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
               commission: parseFloat(commission) || 0,
               stockQuantity: parseInt(stockQuantity, 10) || 0,
               isAvailable,
+              approvalStatus,
               purchaseUrl: purchaseUrl || null,
               imageUrls: finalImageUrls,
               videoUrl: finalVideoUrl || null,
@@ -254,9 +258,24 @@ export function EditProductDialog({ product, isOpen, onOpenChange }: EditProduct
                 <Label htmlFor="edit-purchaseUrl">رابط الشراء</Label>
                 <Input id="edit-purchaseUrl" placeholder="https://supplier.com/product (اختياري)" value={purchaseUrl} onChange={(e) => setPurchaseUrl(e.target.value)} />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-approval-status">حالة الموافقة</Label>
+                <Select value={approvalStatus} onValueChange={(v) => setApprovalStatus(v as any)}>
+                    <SelectTrigger id="edit-approval-status">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Pending">قيد المراجعة</SelectItem>
+                        <SelectItem value="Approved">مقبول</SelectItem>
+                        <SelectItem value="Rejected">مرفوض</SelectItem>
+                    </SelectContent>
+                </Select>
+              </div>
+
                <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
                  <div className="space-y-0.5">
-                    <Label htmlFor="edit-isAvailable">الحالة</Label>
+                    <Label htmlFor="edit-isAvailable">الحالة (مرئي للمسوقين)</Label>
                     <p className="text-xs text-muted-foreground">إلغاء التفعيل سيخفي المنتج من المتجر.</p>
                 </div>
                 <Switch id="edit-isAvailable" checked={isAvailable} onCheckedChange={setIsAvailable} />

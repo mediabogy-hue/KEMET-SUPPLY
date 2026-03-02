@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Wallet, RefreshCcw, AlertTriangle, TrendingUp, Truck } from "lucide-react";
+import { Calendar, Wallet, RefreshCcw, AlertTriangle, TrendingUp, Truck, ShieldCheck } from "lucide-react";
 
 export default function PoliciesPage() {
   return (
@@ -18,13 +18,30 @@ export default function PoliciesPage() {
             </CardHeader>
             <CardContent className="space-y-4 text-muted-foreground">
                  <ul className="list-disc pe-6 space-y-2">
-                    <li>عمولة المسوق: ثابتة بنسبة **1.25%** من إجمالي سعر الطلب.</li>
+                    <li>عمولة المسوق: يقوم التاجر بتحديدها بالجنيه المصري لكل منتج على حدة.</li>
                     <li>عمولة المنصة: ثابتة بنسبة **5%** من إجمالي سعر الطلب.</li>
                     <li>ربح التاجر: هو المبلغ المتبقي بعد خصم عمولة المسوق وعمولة المنصة.</li>
                 </ul>
                 <p>
-                    تصبح أرباح الطلب متاحة للسحب فور تغيير حالة الطلب إلى **"تم التوصيل" (Delivered)**. لم يعد هناك فترة انتظار للأرباح المعلقة.
+                    تصبح أرباح الطلب متاحة للسحب فور تغيير حالة الطلب إلى **"تم التوصيل" (Delivered)**.
                 </p>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <ShieldCheck className="h-6 w-6 text-primary"/>
+                    سياسة إضافة المنتجات
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-muted-foreground">
+                <p>لضمان جودة المنتجات المعروضة على المنصة، تخضع جميع المنتجات الجديدة لعملية مراجعة من قبل الإدارة.</p>
+                 <ul className="list-disc pe-6 space-y-2">
+                    <li>عندما يقوم التاجر بإضافة منتج جديد، يكون المنتج في حالة **"قيد المراجعة"** ولا يظهر للمسوقين.</li>
+                    <li>يقوم فريق الإدارة بمراجعة المنتج والموافقة عليه أو رفضه.</li>
+                    <li>فقط المنتجات التي يتم **"قبولها"** هي التي تظهر في صفحة المنتجات وتكون متاحة للتسويق.</li>
+                </ul>
             </CardContent>
         </Card>
 

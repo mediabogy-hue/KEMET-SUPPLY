@@ -50,6 +50,7 @@ export interface Product {
   commission: number;
   stockQuantity: number;
   isAvailable: boolean;
+  approvalStatus: 'Pending' | 'Approved' | 'Rejected';
   imageUrls: string[];
   videoUrl?: string;
   purchaseUrl?: string;

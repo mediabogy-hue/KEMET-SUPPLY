@@ -60,7 +60,7 @@ export default function NewOrderPage() {
   const quantity = watch("quantity");
 
   const totalAmount = selectedProduct ? selectedProduct.price * quantity : 0;
-  const unitCommission = selectedProduct ? selectedProduct.price * 0.0125 : 0;
+  const unitCommission = selectedProduct ? selectedProduct.commission : 0;
   const totalCommission = unitCommission * quantity;
   const platformFee = totalAmount * 0.05;
 
@@ -86,6 +86,7 @@ export default function NewOrderPage() {
       customerNotes: data.notes || "",
       productId: selectedProduct.id,
       productName: selectedProduct.name,
+      productImageUrl: selectedProduct.imageUrls?.[0] || null,
       quantity: data.quantity,
       unitPrice: selectedProduct.price,
       unitCommission: unitCommission,
