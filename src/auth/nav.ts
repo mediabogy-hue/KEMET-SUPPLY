@@ -22,7 +22,7 @@ export const navLinks: NavLink[] = [
     },
     {
         href: "/products",
-        label: "المنتجات",
+        label: "تصفح المنتجات والفئات",
         icon: React.createElement(Box),
         roles: ['Dropshipper'],
     },
@@ -46,7 +46,7 @@ export const navLinks: NavLink[] = [
     },
      {
         href: "/policy",
-        label: "سياسة السحب",
+        label: "السياسات والأحكام",
         icon: React.createElement(ShieldCheck),
         roles: ['Dropshipper'],
     },
