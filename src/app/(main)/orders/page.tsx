@@ -5,7 +5,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useSession } from '@/auth/SessionProvider';
-import { collection, query, where, doc, getDoc } from 'firebase/firestore'; // Removed orderBy
+import { collection, query, where, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import type { Order, Shipment, Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,25 +26,23 @@ export default function MyOrdersPage() {
     const [orderToViewShipment, setOrderToViewShipment] = useState<Order | null>(null);
     const [shipmentDetails, setShipmentDetails] = useState<Shipment | null>(null);
 
-    // Query without ordering to avoid needing a composite index
+    // Query for recent orders to improve performance
     const ordersQuery = useMemoFirebase(
         () => (firestore && user) ? query(
             collection(firestore, 'orders'),
-            where('dropshipperId', '==', user.uid)
+            where('dropshipperId', '==', user.uid),
+            orderBy('createdAt', 'desc'),
+            limit(100)
         ) : null,
         [firestore, user]
     );
 
     const { data: orders, isLoading, error } = useCollection<Order>(ordersQuery);
 
-    // Sort the data on the client-side
+    // Data is already sorted by the query.
     const sortedOrders = useMemo(() => {
         if (!orders) return [];
-        return [...orders].sort((a, b) => {
-            const dateA = a.createdAt?.toDate?.().getTime() || 0;
-            const dateB = b.createdAt?.toDate?.().getTime() || 0;
-            return dateB - dateA; // Sort descending
-        });
+        return orders;
     }, [orders]);
 
 

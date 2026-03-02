@@ -4,7 +4,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, doc, updateDoc, deleteDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { collection, query, doc, updateDoc, deleteDoc, serverTimestamp, getDoc, orderBy, limit } from 'firebase/firestore';
 import type { Order, Shipment } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,21 +28,17 @@ export default function AdminOrdersPage() {
     const [orderToViewShipment, setOrderToViewShipment] = useState<Order | null>(null);
     const [shipmentDetails, setShipmentDetails] = useState<Shipment | null>(null);
 
-    // Use real-time listener for orders
+    // Use real-time listener for orders, but limit to recent ones for performance.
     const ordersQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'orders')) : null),
+        () => (firestore ? query(collection(firestore, 'orders'), orderBy('createdAt', 'desc'), limit(200)) : null),
         [firestore]
     );
     const { data: orders, isLoading: ordersLoading, error: ordersError } = useCollection<Order>(ordersQuery);
 
-    // Sort on the client to avoid indexing issues
+    // The data is already sorted by the query, so this is not strictly necessary but harmless.
     const sortedOrders = useMemo(() => {
         if (!orders) return [];
-        return [...orders].sort((a, b) => {
-            const dateA = a.createdAt?.toDate?.().getTime() || 0;
-            const dateB = b.createdAt?.toDate?.().getTime() || 0;
-            return dateB - dateA;
-        });
+        return orders; // Already sorted by Firestore
     }, [orders]);
 
 
@@ -149,7 +145,7 @@ export default function AdminOrdersPage() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">إدارة الطلبات</h1>
-                <p className="text-muted-foreground">عرض وتعديل وتتبع جميع طلبات العملاء.</p>
+                <p className="text-muted-foreground">عرض وتتبع جميع طلبات العملاء.</p>
             </div>
             <Card>
                 <CardContent className="pt-6">

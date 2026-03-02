@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, doc, deleteDoc, orderBy, limit } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -30,21 +31,17 @@ export default function AdminProductsPage() {
     const [productToAnalyze, setProductToAnalyze] = useState<Product | null>(null);
     const [productToUpdateStock, setProductToUpdateStock] = useState<Product | null>(null);
     
-    // Use real-time listener for products
+    // Use real-time listener for products, limited for performance
     const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, "products")) : null),
+        () => (firestore ? query(collection(firestore, "products"), orderBy("createdAt", "desc"), limit(100)) : null),
         [firestore]
     );
     const { data: products, isLoading, error } = useCollection<Product>(productsQuery);
 
-    // Sort on the client to avoid indexing issues and for consistency
+    // Data is already sorted by the query
     const sortedProducts = useMemo(() => {
         if (!products) return [];
-        return [...products].sort((a, b) => {
-            const timeA = (a.createdAt as any)?.toMillis?.() || 0;
-            const timeB = (b.createdAt as any)?.toMillis?.() || 0;
-            return timeB - timeA;
-        });
+        return products;
     }, [products]);
 
 
