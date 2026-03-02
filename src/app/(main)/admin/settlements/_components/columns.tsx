@@ -1,3 +1,4 @@
+
 "use client"
 
 import { ColumnDef } from "@tanstack/react-table"
@@ -36,7 +37,8 @@ export const getColumns = (
     accessorKey: "commission",
     header: "ربح المسوق",
     cell: ({ row }) => {
-        const commission = row.original.totalCommission || 0;
+        const order = row.original;
+        const commission = (order.totalAmount || 0) * 0.0125; // Fixed 1.25%
         return <span className="font-semibold text-green-600">{commission.toFixed(2)} ج.م</span>
     }
   },
@@ -45,9 +47,11 @@ export const getColumns = (
     header: "ربح التاجر",
     cell: ({ row }) => {
         const order = row.original;
-        // Defensive calculation for old orders where platformFee might be 0 or missing
-        const platformFee = order.platformFee || ((order.totalAmount || 0) * 0.05);
-        const profit = (order.totalAmount || 0) - (order.totalCommission || 0) - platformFee;
+        const totalAmount = order.totalAmount || 0;
+        const dropshipperCommission = totalAmount * 0.0125; // Fixed 1.25%
+        const platformFee = totalAmount * 0.05; // Fixed 5%
+        const profit = totalAmount - dropshipperCommission - platformFee;
+        
         if (!order.merchantId) return <span className="text-muted-foreground">-</span>;
         return <span className="font-semibold">{profit.toFixed(2)} ج.م</span>
     }
@@ -57,8 +61,7 @@ export const getColumns = (
     header: "عمولة المنصة",
     cell: ({ row }) => {
         const order = row.original;
-        // Defensive calculation for old orders where platformFee might be 0 or missing
-        const fee = order.platformFee || ((order.totalAmount || 0) * 0.05);
+        const fee = (order.totalAmount || 0) * 0.05; // Fixed 5%
         return <span className="font-semibold text-sky-500">{fee.toFixed(2)} ج.م</span>
     }
   },

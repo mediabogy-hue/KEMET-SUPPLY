@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -43,7 +44,7 @@ export default function SettlementsPage() {
         try {
             // === Start of Firestore Transaction ===
             await runTransaction(firestore, async (transaction) => {
-                // 1. READ the order document first. This is mandatory for any transaction.
+                // 1. READ all documents that will be written to. This is a transaction requirement.
                 const orderRef = doc(firestore, 'orders', order.id);
                 const freshOrderDoc = await transaction.get(orderRef);
 
@@ -53,23 +54,19 @@ export default function SettlementsPage() {
                 
                 const freshOrderData = freshOrderDoc.data() as Order;
 
-                // 2. DEFINE all financial values from the FRESH, RELIABLE order data.
+                // 2. DEFINE all financial values from the FRESH, RELIABLE order data, RECALCULATING based on fixed percentages.
                 const orderTotalAmount = Number(freshOrderData.totalAmount || 0);
-                const dropshipperCommission = Number(freshOrderData.totalCommission || 0);
                 
-                // DEFENSIVE CALCULATION: If platformFee is missing or 0 on an old order, calculate it.
-                let platformFee = Number(freshOrderData.platformFee || 0);
-                if (platformFee === 0 && orderTotalAmount > 0) {
-                    platformFee = orderTotalAmount * 0.05;
-                }
-
-                // THE CORRECT and FINAL calculation for merchant profit.
+                // --- FIXED CALCULATION ---
+                const dropshipperCommission = orderTotalAmount * 0.0125;
+                const platformFee = orderTotalAmount * 0.05;
                 const merchantProfit = orderTotalAmount - dropshipperCommission - platformFee;
+                // --- END OF FIXED CALCULATION ---
 
                 const dropshipperId = freshOrderData.dropshipperId;
                 const merchantId = freshOrderData.merchantId;
 
-                // 3. READ all wallet documents that will be written to. This is a transaction requirement.
+                // 3. READ all wallet documents that will be written to.
                 const dropshipperWalletRef = doc(firestore, 'wallets', dropshipperId);
                 const dropshipperWalletDoc = await transaction.get(dropshipperWalletRef);
 
@@ -99,7 +96,6 @@ export default function SettlementsPage() {
                             updatedAt: serverTimestamp() 
                         });
                     } else {
-                        // Create a new, complete wallet if it doesn't exist
                         transaction.set(dropshipperWalletRef, {
                             id: dropshipperId,
                             availableBalance: dropshipperCommission,
@@ -119,7 +115,6 @@ export default function SettlementsPage() {
                             updatedAt: serverTimestamp() 
                         });
                     } else {
-                        // Create a new, complete wallet if it doesn't exist
                         transaction.set(merchantWalletRef, {
                             id: merchantId!,
                             availableBalance: merchantProfit,
