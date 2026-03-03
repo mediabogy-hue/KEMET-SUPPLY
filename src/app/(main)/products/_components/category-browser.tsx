@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -20,9 +20,9 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    // Query for available categories directly
+    // Fetch all categories and filter on the client for robustness.
     const categoriesQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, "productCategories"), where("isAvailable", "==", true)) : null),
+        () => (firestore ? query(collection(firestore, "productCategories")) : null),
         [firestore]
     );
     const { data: categories, isLoading, error } = useCollection<ProductCategory>(categoriesQuery);
@@ -32,17 +32,16 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
             toast({
                 variant: "destructive",
                 title: "فشل تحميل الفئات",
-                description: error.message,
+                description: 'حدث خطأ أثناء جلب البيانات. يرجى التأكد من صلاحيات قراءة قاعدة البيانات.',
             });
             console.error("Category fetch error:", error);
         }
     }, [error, toast]);
 
-
-    // No need for client-side filtering anymore, but useMemo is still good for stability
     const sortedCategories = useMemo(() => {
         if (!categories) return [];
-        return categories;
+        // Client-side filtering
+        return categories.filter(c => c.isAvailable === true);
     }, [categories]);
 
     return (
