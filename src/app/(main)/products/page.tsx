@@ -6,10 +6,12 @@ import { collection, query } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Search, DatabaseZap } from 'lucide-react';
 import { CategoryBrowser } from './_components/category-browser';
 import { ProductCard } from './_components/product-card';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function ProductsPage() {
     const firestore = useFirestore();
@@ -17,14 +19,12 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // Use a simpler query. Filtering will happen on the client.
     const productsQuery = useMemoFirebase(
-        () => (firestore ? collection(firestore, 'products') : null),
+        () => (firestore ? query(collection(firestore, 'products')) : null),
         [firestore]
     );
     const { data: products, isLoading: productsLoading, error } = useCollection<Product>(productsQuery);
     
-    // Display error toast if fetching fails
     useEffect(() => {
         if (error) {
             toast({
@@ -36,16 +36,13 @@ export default function ProductsPage() {
         }
     }, [error, toast]);
 
-
-    const filteredAndSortedProducts = useMemo(() => {
+    const filteredProducts = useMemo(() => {
         if (!products) return [];
         
-        // Filter on the client-side for maximum reliability.
         return products
-            .filter(p => p.approvalStatus === 'Approved' && p.isAvailable === true)
+            .filter(p => p.isAvailable === true && p.approvalStatus === 'Approved')
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
     }, [products, searchTerm, selectedCategory]);
 
     return (
@@ -68,14 +65,22 @@ export default function ProductsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {productsLoading ? (
                     Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-96 rounded-lg" />)
-                ) : filteredAndSortedProducts.length > 0 ? (
-                    filteredAndSortedProducts.map(product => (
+                ) : filteredProducts.length > 0 ? (
+                    filteredProducts.map(product => (
                         <ProductCard key={product.id} product={product} />
                     ))
                 ) : (
                     <div className="col-span-full text-center py-16">
-                        <h3 className="text-lg font-semibold">لا توجد منتجات</h3>
-                        <p className="text-muted-foreground mt-2">لا توجد منتجات متاحة للعرض حاليًا. قد تكون قيد المراجعة أو غير مضافة بعد.</p>
+                        <h3 className="text-xl font-semibold">لا توجد منتجات لعرضها</h3>
+                        <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                            قد تكون قاعدة البيانات فارغة أو أن المنتجات الموجودة غير متاحة للتسويق حاليًا.
+                        </p>
+                         <Button asChild className="mt-6">
+                            <Link href="/admin/dashboard">
+                                <DatabaseZap className="me-2" />
+                                جرب إضافة بيانات تجريبية من لوحة تحكم الأدمن
+                            </Link>
+                        </Button>
                     </div>
                 )}
             </div>

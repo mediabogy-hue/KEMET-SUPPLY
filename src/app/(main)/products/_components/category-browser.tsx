@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -20,9 +20,9 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    // Use a simpler, more robust query for categories.
+    // Query for available categories directly
     const categoriesQuery = useMemoFirebase(
-        () => (firestore ? collection(firestore, "productCategories") : null),
+        () => (firestore ? query(collection(firestore, "productCategories"), where("isAvailable", "==", true)) : null),
         [firestore]
     );
     const { data: categories, isLoading, error } = useCollection<ProductCategory>(categoriesQuery);
@@ -39,10 +39,10 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
     }, [error, toast]);
 
 
+    // No need for client-side filtering anymore, but useMemo is still good for stability
     const sortedCategories = useMemo(() => {
-        // Filter on the client-side for maximum reliability.
         if (!categories) return [];
-        return categories.filter(c => c.isAvailable === true);
+        return categories;
     }, [categories]);
 
     return (
@@ -91,8 +91,9 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
                         <span className="text-sm font-medium text-center">{category.name}</span>
                     </div>
                 ))}
-                {!isLoading && sortedCategories.length === 0 && (
+                {!isLoading && (!sortedCategories || sortedCategories.length === 0) && (
                     <div className="col-span-full text-center py-8 text-muted-foreground">
+                        {/* This message will appear if no categories are 'isAvailable: true' */}
                         <p>لم يتم إضافة فئات للمنتجات بعد.</p>
                     </div>
                 )}
