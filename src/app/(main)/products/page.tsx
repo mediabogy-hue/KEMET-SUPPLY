@@ -3,7 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -18,11 +18,9 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // More efficient query: Fetch only approved and available products directly.
-    // This requires a composite index on (approvalStatus, isAvailable), which Firestore prompts for.
-    // A simpler query is used here to avoid index dependency for now.
+    // Use a simpler, more robust query. Filtering will happen on the client.
     const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'products'), where('approvalStatus', '==', 'Approved'), where('isAvailable', '==', true), orderBy('createdAt', 'desc')) : null),
+        () => (firestore ? query(collection(firestore, 'products'), orderBy('createdAt', 'desc')) : null),
         [firestore]
     );
     const { data: products, isLoading: productsLoading, error } = useCollection<Product>(productsQuery);
@@ -43,9 +41,9 @@ export default function ProductsPage() {
     const filteredAndSortedProducts = useMemo(() => {
         if (!products) return [];
         
-        // The query now handles filtering for approval and availability.
-        // We only need to filter for category and search term on the client.
+        // Filter on the client-side for maximum reliability.
         return products
+            .filter(p => p.approvalStatus === 'Approved' && p.isAvailable === true)
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
