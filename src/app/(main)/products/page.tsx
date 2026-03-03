@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ export default function ProductsPage() {
     const [selectedCategory, setSelectedCategory] = useState('all');
 
     const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'products')) : null),
+        () => (firestore ? query(collection(firestore, 'products'), where("isAvailable", "==", true), where("approvalStatus", "==", "Approved")) : null),
         [firestore]
     );
     const { data: products, isLoading: productsLoading, error } = useCollection<Product>(productsQuery);
@@ -30,7 +30,8 @@ export default function ProductsPage() {
             toast({
                 variant: 'destructive',
                 title: 'فشل تحميل المنتجات',
-                description: 'حدث خطأ أثناء جلب البيانات. يرجى المحاولة مرة أخرى.',
+                description: 'حدث خطأ أثناء جلب البيانات. قد يتطلب الأمر إنشاء فهرس في قاعدة البيانات. تحقق من الكونسول لمزيد من التفاصيل.',
+                duration: 10000,
             });
             console.error("Product query error:", error);
         }
@@ -40,7 +41,6 @@ export default function ProductsPage() {
         if (!products) return [];
         
         return products
-            .filter(p => p.isAvailable === true && p.approvalStatus === 'Approved')
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [products, searchTerm, selectedCategory]);
@@ -73,7 +73,8 @@ export default function ProductsPage() {
                     <div className="col-span-full text-center py-16">
                         <h3 className="text-xl font-semibold">لا توجد منتجات لعرضها</h3>
                         <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                            قد تكون قاعدة البيانات فارغة أو أن المنتجات الموجودة غير متاحة للتسويق حاليًا.
+                            قد تكون قاعدة البيانات فارغة، أو أن المنتجات الموجودة غير متاحة للتسويق حاليًا.
+                            إذا استمرت المشكلة، قد تحتاج لإنشاء فهرس في قاعدة البيانات.
                         </p>
                          <Button asChild className="mt-6">
                             <Link href="/admin/dashboard">
