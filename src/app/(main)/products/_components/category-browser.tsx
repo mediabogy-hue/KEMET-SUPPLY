@@ -1,4 +1,3 @@
-
 'use client';
 import { useEffect } from 'react';
 import Image from 'next/image';
@@ -6,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { LayoutGrid } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCollection, useMemoFirebase, useFirestore } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import type { ProductCategory } from '@/lib/types';
 import { useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -23,7 +22,7 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
     
     // Use a simpler, more robust query for categories.
     const categoriesQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, "productCategories"), orderBy("name", "asc")) : null),
+        () => (firestore ? collection(firestore, "productCategories") : null),
         [firestore]
     );
     const { data: categories, isLoading, error } = useCollection<ProductCategory>(categoriesQuery);

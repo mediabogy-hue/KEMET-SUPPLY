@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -18,9 +17,9 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // Use a simpler, more robust query. Filtering will happen on the client.
+    // Use a simpler query. Filtering will happen on the client.
     const productsQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'products'), orderBy('createdAt', 'desc')) : null),
+        () => (firestore ? collection(firestore, 'products') : null),
         [firestore]
     );
     const { data: products, isLoading: productsLoading, error } = useCollection<Product>(productsQuery);
