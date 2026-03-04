@@ -157,7 +157,7 @@ export default function AdminProductsPage() {
                                         </div>
                                     </div>
                                     <div className="p-2 border-t flex items-center justify-end">
-                                        {product.approvalStatus === 'Pending' ? (
+                                        {!product.approvalStatus || product.approvalStatus === 'Pending' ? (
                                             <div className="flex gap-2 w-full p-2">
                                                 <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleApproval(product, 'Rejected')}>
                                                     <X className="me-2 h-4 w-4" /> رفض
