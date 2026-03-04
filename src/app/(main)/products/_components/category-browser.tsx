@@ -20,7 +20,7 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
     const firestore = useFirestore();
     const { toast } = useToast();
     
-    // Fetch ALL categories for maximum reliability. Filtering will happen on the client.
+    // Fetch ALL categories for maximum reliability.
     const categoriesQuery = useMemoFirebase(
         () => (firestore ? query(collection(firestore, "productCategories")) : null),
         [firestore]
@@ -41,8 +41,8 @@ export function CategoryBrowser({ selectedCategory, onSelectCategory }: Category
 
     const sortedCategories = useMemo(() => {
         if (!categories) return [];
-        // Apply business logic on the client-side to only show available categories.
-        return categories.filter(c => c.isAvailable === true);
+        // No client-side filtering, show all categories.
+        return categories;
     }, [categories]);
 
     return (

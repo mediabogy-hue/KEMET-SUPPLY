@@ -19,11 +19,6 @@ async function getProduct(productId: string): Promise<Product | null> {
         }
         
         const data = docSnap.data();
-
-        // With admin SDK, we bypass security rules. So we must manually enforce public-facing business logic.
-        if (data?.isAvailable !== true || data?.approvalStatus !== 'Approved') {
-            return null;
-        }
         
         const productData = { id: docSnap.id, ...data } as Product;
         

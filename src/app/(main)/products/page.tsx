@@ -39,10 +39,8 @@ export default function ProductsPage() {
     const filteredProducts = useMemo(() => {
         if (!products) return [];
         
-        // Apply business logic filtering on the client-side.
-        // This ensures that only valid, marketable products are shown to the dropshipper.
+        // Apply client-side filtering. Now shows all products regardless of status.
         return products
-            .filter(p => p.isAvailable === true && p.approvalStatus === 'Approved')
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [products, searchTerm, selectedCategory]);
