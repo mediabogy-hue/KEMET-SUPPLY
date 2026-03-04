@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { downloadAsset } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Copy, Download as DownloadIcon, Video } from 'lucide-react';
+import { useSession } from '@/auth/SessionProvider';
 
 // New Gallery Component
 function ImageGallery({ images, productName }: { images: string[], productName: string }) {
@@ -79,6 +80,7 @@ function ImageGallery({ images, productName }: { images: string[], productName: 
 }
 
 export function ProductView({ product, refId, dropshipperName }: { product: Product, refId: string | null, dropshipperName: string | null }) {
+    const { user } = useSession();
     const firestore = useFirestore();
     const { toast } = useToast();
 
@@ -134,38 +136,40 @@ export function ProductView({ product, refId, dropshipperName }: { product: Prod
 
                 <ProductOrderForm product={product} refId={refId} dropshipperName={dropshipperName} />
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle>المحتوى التسويقي</CardTitle>
-                        <CardDescription>استخدم هذه المواد في حملاتك التسويقية.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="flex justify-between items-center">
-                                <Label htmlFor="marketing-desc">الوصف التسويقي</Label>
-                                <Button variant="ghost" size="sm" onClick={() => handleCopy(product.description, 'الوصف')}>
-                                    <Copy className="me-2 h-3.5 w-3.5" />
-                                    نسخ
-                                </Button>
+                {user && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>المحتوى التسويقي</CardTitle>
+                            <CardDescription>استخدم هذه المواد في حملاتك التسويقية.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <Label htmlFor="marketing-desc">الوصف التسويقي</Label>
+                                    <Button variant="ghost" size="sm" onClick={() => handleCopy(product.description, 'الوصف')}>
+                                        <Copy className="me-2 h-3.5 w-3.5" />
+                                        نسخ
+                                    </Button>
+                                </div>
+                                <Textarea id="marketing-desc" value={product.description} readOnly rows={5} className="bg-muted/50" />
                             </div>
-                            <Textarea id="marketing-desc" value={product.description} readOnly rows={5} className="bg-muted/50" />
-                        </div>
-                    </CardContent>
-                    <CardFooter className="flex-col items-stretch gap-2">
-                        <Button onClick={handleDownloadImages} disabled={!product.imageUrls || product.imageUrls.length === 0}>
-                            <DownloadIcon className="me-2"/>
-                            تحميل جميع الصور ({product.imageUrls?.length || 0})
-                        </Button>
-                        {product.videoUrl && (
-                             <Button variant="secondary" asChild>
-                                <a href={product.videoUrl} target="_blank" rel="noopener noreferrer">
-                                    <Video className="me-2" />
-                                    مشاهدة/تحميل الفيديو
-                                </a>
+                        </CardContent>
+                        <CardFooter className="flex-col items-stretch gap-2">
+                            <Button onClick={handleDownloadImages} disabled={!product.imageUrls || product.imageUrls.length === 0}>
+                                <DownloadIcon className="me-2"/>
+                                تحميل جميع الصور ({product.imageUrls?.length || 0})
                             </Button>
-                        )}
-                    </CardFooter>
-                </Card>
+                            {product.videoUrl && (
+                                 <Button variant="secondary" asChild>
+                                    <a href={product.videoUrl} target="_blank" rel="noopener noreferrer">
+                                        <Video className="me-2" />
+                                        مشاهدة/تحميل الفيديو
+                                    </a>
+                                </Button>
+                            )}
+                        </CardFooter>
+                    </Card>
+                )}
             </div>
         </div>
     );
