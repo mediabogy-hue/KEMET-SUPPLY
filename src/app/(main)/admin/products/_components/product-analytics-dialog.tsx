@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
 import { collection, query, where, getDocs, collectionGroup, orderBy, documentId } from "firebase/firestore";
 import type { Product, Order } from "@/lib/types";
-import { Users, MousePointerClick, ShoppingCart, Package, CornerDownLeft, Percent } from "lucide-react";
+import { Users, MousePointerClick, ShoppingCart, Package, CornerDownLeft, Percent, BarChart2 } from "lucide-react";
 import Image from "next/image";
 
 interface ProductAnalyticsDialogProps {

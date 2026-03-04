@@ -96,9 +96,25 @@ export default function MerchantProductsPage() {
                                             height={400}
                                             className="aspect-square object-contain w-full"
                                         />
-                                        <Badge className="absolute top-2 right-2" variant={product.isAvailable ? 'default' : 'destructive'}>
-                                            {product.isAvailable ? "متاح" : "غير متاح"}
+                                         <Badge
+                                            variant={
+                                                product.approvalStatus === 'Approved' ? 'default' :
+                                                product.approvalStatus === 'Rejected' ? 'destructive' :
+                                                'secondary'
+                                            }
+                                            className="absolute top-2 right-2"
+                                        >
+                                            {
+                                                product.approvalStatus === 'Approved' ? 'مقبول' :
+                                                product.approvalStatus === 'Rejected' ? 'مرفوض' :
+                                                'قيد المراجعة'
+                                            }
                                         </Badge>
+                                        {product.approvalStatus === 'Approved' && (
+                                            <Badge className="absolute top-2 left-2" variant={product.isAvailable ? 'default' : 'destructive'}>
+                                                {product.isAvailable ? "متاح" : "غير متاح"}
+                                            </Badge>
+                                        )}
                                     </div>
                                     <CardHeader className="flex-grow">
                                         <CardTitle className="text-lg leading-tight h-12">{product.name}</CardTitle>

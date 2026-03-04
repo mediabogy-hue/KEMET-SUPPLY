@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { Badge } from '@/components/ui/badge';
-import { MoreHorizontal, Edit, Trash2, Package, Check, X } from 'lucide-react';
+import { MoreHorizontal, Edit, Trash2, Package, Check, X, BarChart2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 
 import { AddProductDialog } from './_components/add-product-dialog';
@@ -165,9 +165,20 @@ export default function AdminProductsPage() {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
                                                 <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                {product.approvalStatus === 'Pending' && (
+                                                    <>
+                                                        <DropdownMenuItem onClick={() => handleApproval(product, 'Approved')}>
+                                                            <Check className="me-2 text-green-500"/> قبول المنتج
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => handleApproval(product, 'Rejected')} className="text-destructive">
+                                                            <X className="me-2"/> رفض المنتج
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuSeparator />
+                                                    </>
+                                                )}
                                                 <DropdownMenuItem onClick={() => setProductToEdit(product)}><Edit className="me-2"/> تعديل المنتج</DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setProductToUpdateStock(product)}><Package className="me-2"/> تحديث المخزون</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => setProductToAnalyze(product)}>تحليلات</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setProductToAnalyze(product)}><BarChart2 className="me-2"/> تحليلات</DropdownMenuItem>
                                                 <DropdownMenuSeparator />
                                                 <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive"><Trash2 className="me-2"/> حذف المنتج</DropdownMenuItem>
                                             </DropdownMenuContent>
