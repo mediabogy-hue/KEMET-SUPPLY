@@ -6,8 +6,25 @@ import Image from 'next/image';
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { ProductOrderForm } from './product-order-form';
 import { Separator } from '@/components/ui/separator';
+import { useFirestore } from '@/firebase';
+import { useEffect } from 'react';
+import { doc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 
 export function ProductView({ product, refId, dropshipperName }: { product: Product, refId: string | null, dropshipperName: string | null }) {
+    const firestore = useFirestore();
+
+    useEffect(() => {
+        if (firestore && refId && product.id) {
+            // Track the affiliate link click non-blockingly
+            const clickRef = doc(collection(firestore, `products/${product.id}/clicks`));
+            setDoc(clickRef, {
+                ref: refId,
+                timestamp: serverTimestamp(),
+                userAgent: navigator.userAgent,
+            }).catch(err => console.error("Failed to track click:", err));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firestore, refId, product.id]);
     
     return (
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12 items-start">
