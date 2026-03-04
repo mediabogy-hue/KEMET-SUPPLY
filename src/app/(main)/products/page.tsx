@@ -40,8 +40,9 @@ export default function ProductsPage() {
         if (!products) return [];
         
         // Apply business logic filtering on the client-side.
-        // This ensures that even if the query fetches everything, only relevant products are shown.
+        // This ensures that only valid, marketable products are shown to the dropshipper.
         return products
+            .filter(p => p.isAvailable === true && p.approvalStatus === 'Approved')
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [products, searchTerm, selectedCategory]);
