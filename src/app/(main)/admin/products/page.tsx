@@ -157,32 +157,32 @@ export default function AdminProductsPage() {
                                         </div>
                                     </div>
                                     <div className="p-2 border-t flex items-center justify-end">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                    <MoreHorizontal className="h-4 w-4" />
+                                        {product.approvalStatus === 'Pending' ? (
+                                            <div className="flex gap-2 w-full p-2">
+                                                <Button variant="destructive" size="sm" className="flex-1" onClick={() => handleApproval(product, 'Rejected')}>
+                                                    <X className="me-2" /> رفض
                                                 </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
-                                                {product.approvalStatus === 'Pending' && (
-                                                    <>
-                                                        <DropdownMenuItem onClick={() => handleApproval(product, 'Approved')}>
-                                                            <Check className="me-2 text-green-500"/> قبول المنتج
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleApproval(product, 'Rejected')} className="text-destructive">
-                                                            <X className="me-2"/> رفض المنتج
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                    </>
-                                                )}
-                                                <DropdownMenuItem onClick={() => setProductToEdit(product)}><Edit className="me-2"/> تعديل المنتج</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => setProductToUpdateStock(product)}><Package className="me-2"/> تحديث المخزون</DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => setProductToAnalyze(product)}><BarChart2 className="me-2"/> تحليلات</DropdownMenuItem>
-                                                <DropdownMenuSeparator />
-                                                <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive"><Trash2 className="me-2"/> حذف المنتج</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                                <Button size="sm" className="flex-1" onClick={() => handleApproval(product, 'Approved')}>
+                                                    <Check className="me-2" /> قبول
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuLabel>الإجراءات</DropdownMenuLabel>
+                                                    <DropdownMenuItem onClick={() => setProductToEdit(product)}><Edit className="me-2"/> تعديل المنتج</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setProductToUpdateStock(product)}><Package className="me-2"/> تحديث المخزون</DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => setProductToAnalyze(product)}><BarChart2 className="me-2"/> تحليلات</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setProductToDelete(product)} className="text-destructive"><Trash2 className="me-2"/> حذف المنتج</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
                                 </Card>
                             ))}
