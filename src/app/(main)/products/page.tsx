@@ -17,7 +17,7 @@ export default function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
 
-    // Fetch ALL products without any 'where' clauses.
+    // Fetch ALL products without any 'where' clauses for maximum reliability.
     const productsQuery = useMemoFirebase(
         () => (firestore ? query(collection(firestore, 'products')) : null),
         [firestore]
@@ -39,9 +39,10 @@ export default function ProductsPage() {
     const filteredProducts = useMemo(() => {
         if (!products) return [];
         
-        // Apply business logic filtering on the client-side
+        // Apply business logic filtering on the client-side.
+        // This ensures that even if the query fetches everything, only relevant products are shown.
         return products
-            .filter(p => p.isAvailable && p.approvalStatus === 'Approved')
+            .filter(p => p.isAvailable === true && p.approvalStatus === 'Approved')
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [products, searchTerm, selectedCategory]);
@@ -72,9 +73,9 @@ export default function ProductsPage() {
                     ))
                 ) : (
                     <div className="col-span-full text-center py-16">
-                        <h3 className="text-xl font-semibold">لا توجد منتجات لعرضها</h3>
+                        <h3 className="text-xl font-semibold">لا توجد منتجات متاحة للتسويق حاليًا</h3>
                         <p className="text-muted-foreground mt-2 max-w-md mx-auto">
-                            لا توجد حاليًا منتجات متاحة للتسويق. حاول تغيير الفلاتر أو تحقق مرة أخرى قريبًا.
+                            قد تكون المنتجات قيد المراجعة أو نفدت كميتها. حاول التحقق مرة أخرى قريبًا أو تواصل مع الإدارة.
                         </p>
                     </div>
                 )}
