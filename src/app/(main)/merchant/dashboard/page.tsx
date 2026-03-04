@@ -9,10 +9,9 @@ import { collection, query, where, orderBy, limit, doc } from "firebase/firestor
 import { Skeleton } from '@/components/ui/skeleton';
 import { Box, ShoppingCart, Activity, Wallet as WalletIcon, Package, PackageX, PlusCircle } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatDistanceToNow } from 'date-fns';
-import { ar } from 'date-fns/locale';
 import { OrderStatusBadge } from '@/app/(main)/merchant/orders/_components/order-status-badge';
 import { Button } from '@/components/ui/button';
+import { ClientRelativeTime } from '@/components/shared/client-relative-time';
 
 export default function MerchantDashboardPage() {
   const { profile, user } = useSession();
@@ -159,8 +158,8 @@ export default function MerchantDashboardPage() {
                                 </TableCell>
                                 <TableCell>{order.customerName}</TableCell>
                                 <TableCell><OrderStatusBadge status={order.status} /></TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                    {order.createdAt?.toDate ? formatDistanceToNow(order.createdAt.toDate(), { addSuffix: true, locale: ar }) : 'N/A'}
+                                <TableCell>
+                                    <ClientRelativeTime date={order.createdAt?.toDate()} className="text-xs text-muted-foreground" />
                                 </TableCell>
                             </TableRow>
                         ))}
