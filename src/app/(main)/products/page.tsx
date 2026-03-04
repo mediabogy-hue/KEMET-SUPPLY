@@ -39,7 +39,6 @@ export default function ProductsPage() {
         if (!products) return [];
         
         return products
-            .filter(p => p.approvalStatus === 'Approved' && p.isAvailable)
             .filter(p => selectedCategory === 'all' || p.category === selectedCategory)
             .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [products, searchTerm, selectedCategory]);
@@ -70,7 +69,7 @@ export default function ProductsPage() {
                     ))
                 ) : (
                     <div className="col-span-full text-center py-16">
-                        <h3 className="text-xl font-semibold">لا توجد منتجات متاحة للتسويق حاليًا</h3>
+                        <h3 className="text-xl font-semibold">لا توجد منتجات متاحة للعرض حاليًا</h3>
                         <p className="text-muted-foreground mt-2 max-w-md mx-auto">
                             قد تكون المنتجات قيد المراجعة أو نفدت كميتها. حاول التحقق مرة أخرى قريبًا أو تواصل مع الإدارة.
                         </p>

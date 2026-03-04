@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/lib/types';
 import { Copy } from 'lucide-react';
 import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 interface ProductCardProps {
     product: Product;
@@ -52,17 +53,26 @@ export function ProductCard({ product }: ProductCardProps) {
         });
     };
 
+    const isSellable = product.approvalStatus === 'Approved' && product.isAvailable;
+
     return (
         <Card className="flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group">
             <Link href={`/product/${product.id}${user ? `?ref=${user.uid}` : ''}`} className="block">
-                <CardContent className="p-0 aspect-square">
-                    <Image
+                 <CardContent className="p-0 aspect-square relative">
+                     <Image
                         src={product.imageUrls?.[0] || `https://picsum.photos/seed/${product.id}/600`}
                         alt={product.name}
                         width={600}
                         height={600}
                         className="w-full h-full object-contain transition-transform group-hover:scale-105"
                     />
+                    {!isSellable && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                            <Badge variant="destructive" className="text-base py-1 px-3">
+                                {product.approvalStatus !== 'Approved' ? 'قيد المراجعة' : 'غير متوفر'}
+                            </Badge>
+                        </div>
+                    )}
                 </CardContent>
             </Link>
             <CardHeader className="flex-grow">
@@ -78,12 +88,11 @@ export function ProductCard({ product }: ProductCardProps) {
                     <span className="text-muted-foreground">العمولة:</span>
                     <span className="text-lg text-green-600">{product.commission.toFixed(2)} ج.م</span>
                 </div>
-                <Button className="w-full mt-2" onClick={handleCopyLink}>
+                <Button className="w-full mt-2" onClick={handleCopyLink} disabled={!isSellable}>
                     <Copy className="me-2"/>
-                    نسخ رابط التسويق
+                    {isSellable ? 'نسخ رابط التسويق' : 'لا يمكن التسويق'}
                 </Button>
             </CardFooter>
         </Card>
     );
 }
-
