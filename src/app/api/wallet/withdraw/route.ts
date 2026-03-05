@@ -1,14 +1,15 @@
-
-import { NextResponse } from 'next/server';
-
-export const dynamic = 'force-dynamic';
+import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  // This feature has been deprecated and replaced by a client-side implementation.
-  return NextResponse.json(
-    { error: 'This API endpoint is no longer in use.' },
-    { status: 410 } // 410 Gone
-  );
+  try {
+    return NextResponse.json(
+      { status: "withdraw API not implemented yet" },
+      { status: 501 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Server error" },
+      { status: 500 }
+    );
+  }
 }
-
-    
