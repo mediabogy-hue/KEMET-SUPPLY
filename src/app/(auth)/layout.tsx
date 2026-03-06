@@ -12,16 +12,16 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
 
   useEffect(() => {
-    if (!isLoading && user) {
-      // User is already logged in, redirect them to their default dashboard.
+    // Only redirect if we are NOT loading, a user exists, AND they have a valid role.
+    if (!isLoading && user && role) {
       const defaultPath = getDefaultPath(role);
       router.replace(defaultPath);
     }
   }, [isLoading, user, role, router]);
 
-  // If session is loading OR user is logged in, show a loading screen
-  // while the redirect is happening.
-  if (isLoading || user) {
+  // Show loading indicator while the session is loading OR if a valid user is found
+  // (which means a redirect is about to happen).
+  if (isLoading || (!isLoading && user && role)) {
      return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -32,6 +32,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  // If session is loaded and there is NO user, show the children (login, register pages).
+  // If the session is loaded and there is NO user (or user has no role), show the children (login, register pages).
+  // This prevents the redirect loop for users in a broken state (auth exists, but profile doesn't).
   return <>{children}</>;
 }

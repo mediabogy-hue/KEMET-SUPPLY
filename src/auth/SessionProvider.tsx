@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { User, onAuthStateChanged, Unsubscribe } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, DocumentData, FirestoreError } from 'firebase/firestore';
 import { useFirebase } from '@/firebase/provider';
 import type { UserProfile } from '@/lib/types';
 
@@ -27,67 +27,57 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { auth, firestore } = useFirebase();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Always start true
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    // First, only handle authentication state changes.
+    const authUnsubscribe = onAuthStateChanged(auth, (authUser) => {
+      setUser(authUser); // This will trigger the second useEffect
+      if (!authUser) {
+        // If there's no user, we are done loading.
+        setProfile(null);
+        setIsLoading(false);
+      }
+    });
+    return () => authUnsubscribe();
+  }, [auth]);
 
   useEffect(() => {
     let profileUnsubscribe: Unsubscribe | undefined;
 
-    const authUnsubscribe = onAuthStateChanged(auth, (authUser) => {
-      // Cleanup previous profile listener
-      if (profileUnsubscribe) {
-        profileUnsubscribe();
-      }
-
-      setUser(authUser); // Set user immediately
-
-      if (authUser) {
-        // User is logged in, now fetch profile. Still loading.
-        setIsLoading(true);
-        const profileDocRef = doc(firestore, 'users', authUser.uid);
-        
-        profileUnsubscribe = onSnapshot(profileDocRef, (docSnap) => {
+    if (user) {
+      // If a user exists, start loading again until we fetch their profile.
+      setIsLoading(true);
+      const profileDocRef = doc(firestore, 'users', user.uid);
+      
+      profileUnsubscribe = onSnapshot(profileDocRef, 
+        (docSnap: DocumentData) => {
           if (docSnap.exists()) {
             setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
           } else {
-            // User exists in Auth, but not in Firestore. This is a valid state to report.
-            // The UI can decide what to do (e.g., redirect, show error, force logout).
-            // Do NOT force logout from here.
             setProfile(null);
-            console.error(`User with UID ${authUser.uid} has a valid auth session but no profile document in Firestore.`);
           }
-          // We have a definitive state for the user and their profile (or lack thereof). Stop loading.
+          // Whether profile exists or not, we are done loading for this user.
           setIsLoading(false);
           setError(null);
-        }, (profileError) => {
+        }, 
+        (profileError: FirestoreError) => {
           console.error("Error fetching user profile:", profileError);
-          setError(profileError);
           setProfile(null);
-          // We have a definitive (error) state. Stop loading.
+          setError(profileError);
+          // Even on error, we are done loading.
           setIsLoading(false);
-        });
-      } else {
-        // No user is logged in. This is a definitive state.
-        setProfile(null);
-        setUser(null);
-        setIsLoading(false); // Stop loading.
-        setError(null);
-      }
-    }, (authError) => {
-      console.error("Authentication state error:", authError);
-      setError(authError);
-      setUser(null);
-      setProfile(null);
-      setIsLoading(false);
-    });
+        }
+      );
+    }
 
     return () => {
-      authUnsubscribe();
       if (profileUnsubscribe) {
         profileUnsubscribe();
       }
     };
-  }, [auth, firestore]);
+  }, [user, firestore]);
 
   const contextValue = useMemo((): SessionContextState => {
     const role = profile?.role || null;
