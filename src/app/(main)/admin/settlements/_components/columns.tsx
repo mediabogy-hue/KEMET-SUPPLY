@@ -38,7 +38,7 @@ export const getColumns = (
     header: "ربح المسوق",
     cell: ({ row }) => {
         const order = row.original;
-        const commission = (order.totalAmount || 0) * 0.0125; // Fixed 1.25%
+        const commission = order.totalCommission || 0; // Use the commission from the order
         return <span className="font-semibold text-green-600">{commission.toFixed(2)} ج.م</span>
     }
   },
@@ -48,8 +48,8 @@ export const getColumns = (
     cell: ({ row }) => {
         const order = row.original;
         const totalAmount = order.totalAmount || 0;
-        const dropshipperCommission = totalAmount * 0.0125; // Fixed 1.25%
-        const platformFee = totalAmount * 0.05; // Fixed 5%
+        const dropshipperCommission = order.totalCommission || 0;
+        const platformFee = order.platformFee || 0;
         const profit = totalAmount - dropshipperCommission - platformFee;
         
         if (!order.merchantId) return <span className="text-muted-foreground">-</span>;
@@ -60,8 +60,7 @@ export const getColumns = (
     accessorKey: "platformFee",
     header: "عمولة المنصة",
     cell: ({ row }) => {
-        const order = row.original;
-        const fee = (order.totalAmount || 0) * 0.05; // Fixed 5%
+        const fee = row.original.platformFee || 0;
         return <span className="font-semibold text-sky-500">{fee.toFixed(2)} ج.م</span>
     }
   },

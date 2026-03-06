@@ -16,29 +16,25 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
 
-  const authorized = hasPermission(role, pathname);
+  // Determine authorization status only after loading is complete.
+  const isAuthorized = !isLoading && user && hasPermission(role, pathname);
 
   useEffect(() => {
     if (isLoading) {
-      return; // Don't do anything while loading.
+      return; // Wait until session state is determined
     }
 
     if (!user) {
-      // If not loading and no user, redirect to login.
+      // If not logged in, redirect to login page.
       router.replace('/login');
-      return;
+    } else if (!hasPermission(role, pathname)) {
+      // If logged in but not authorized for the current path, redirect to their default page.
+      router.replace(getDefaultPath(role));
     }
+  }, [isLoading, user, role, pathname, router]);
 
-    // If user is loaded, but they don't have permission for the current page.
-    if (!authorized) {
-      // Redirect to their default allowed page.
-      const defaultPath = getDefaultPath(role);
-      router.replace(defaultPath);
-    }
-  }, [isLoading, user, role, authorized, pathname, router]);
-
-  // Show a loading spinner if the session is loading, or if the user is about to be redirected.
-  if (isLoading || !user || !authorized) {
+  // Show loading spinner while loading or if the user is not authorized for the current route (and will be redirected).
+  if (isLoading || !isAuthorized) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex items-center gap-2 text-muted-foreground">

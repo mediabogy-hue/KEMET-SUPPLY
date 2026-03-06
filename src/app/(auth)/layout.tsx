@@ -10,26 +10,29 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const { user, role, isLoading } = useSession();
   const router = useRouter();
 
-  // Redirect logged-in users away from auth pages
+  // Determine if the user is logged in (after loading)
+  const isLoggedIn = !isLoading && user && role;
+
   useEffect(() => {
-    if (!isLoading && user && role) {
-      const defaultPath = getDefaultPath(role);
-      router.replace(defaultPath);
+    if (isLoading) return; // Wait until session is loaded
+
+    if (user && role) {
+      router.replace(getDefaultPath(role));
     }
   }, [isLoading, user, role, router]);
 
-  // Show a loading screen while session is loading or while redirecting a logged-in user.
-  if (isLoading || (!isLoading && user && role)) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Rocket className="h-5 w-5 animate-pulse text-primary" />
-            <span>جاري التحميل...</span>
-          </div>
-      </div>
-    );
+  // Show spinner while loading or if user is logged in (and will be redirected)
+  if (isLoading || isLoggedIn) {
+      return (
+        <div className="flex h-screen w-full items-center justify-center bg-background">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Rocket className="h-5 w-5 animate-pulse text-primary" />
+              <span>جاري التحميل...</span>
+            </div>
+        </div>
+      );
   }
 
-  // If not loading and no user, show the auth page (e.g., Login).
+  // Render login/register page only when loading is done and user is not logged in
   return <>{children}</>;
 }
