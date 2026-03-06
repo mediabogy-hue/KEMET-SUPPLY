@@ -1,19 +1,16 @@
 import { NextResponse } from "next/server";
-import { handleWithdraw } from "./handler";
 
 export async function POST(request: Request) {
   try {
-    // The handler is currently empty, so this will be a no-op until logic is added.
-    // However, this structure makes the route valid and buildable.
-    // const result = await handleWithdraw(request);
-    
+    // This server-side route is deprecated. The logic has been moved to a client-side
+    // Firestore Transaction for better security and reliability in src/app/(main)/reports/_components/withdrawal-dialog.tsx.
     return NextResponse.json({
       ok: false,
-      message: "Withdraw API temporarily disabled until full logic is restored"
-    }, { status: 501 });
+      message: "This API endpoint is deprecated. Use the client-side implementation."
+    }, { status: 410 }); // 410 Gone
 
   } catch (error: any) {
-    console.error("Withdraw API Error:", error);
+    console.error("Deprecated Withdraw API Error:", error);
     return NextResponse.json(
       { ok: false, message: error?.message ?? "Internal server error" },
       { status: 500 }
