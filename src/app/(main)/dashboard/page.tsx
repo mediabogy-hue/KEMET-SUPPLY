@@ -26,35 +26,34 @@ export default function DashboardPage() {
     const { user, profile } = useSession();
     const firestore = useFirestore();
 
-    // === QUERIES ===
+    // === OPTIMIZED QUERIES ===
+    const thirtyDaysAgo = useMemo(() => subDays(new Date(), 30), []);
+
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
+        // Fetch only orders from the last 30 days to improve performance
         return query(
             collection(firestore, "orders"),
-            where("dropshipperId", "==", user.uid)
+            where("dropshipperId", "==", user.uid),
+            where("createdAt", ">=", Timestamp.fromDate(thirtyDaysAgo))
         );
-    }, [firestore, user]);
+    }, [firestore, user, thirtyDaysAgo]);
 
     const walletRef = useMemoFirebase(() => (firestore && user) ? doc(firestore, 'wallets', user.uid) : null, [firestore, user]);
 
     // === DATA FETCHING ===
-    const { data: allOrders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
+    // 'orders' now contains only the last 30 days of data directly from Firestore
+    const { data: orders, isLoading: ordersLoading } = useCollection<Order>(ordersQuery);
     const { data: wallet, isLoading: walletLoading } = useDoc<Wallet>(walletRef);
     
     const overallLoading = ordersLoading || walletLoading;
 
     // === MEMOIZED CALCULATIONS ===
-    const orders = useMemo(() => {
-        if (!allOrders) return null;
-        const thirtyDaysAgo = subDays(new Date(), 30);
-        return allOrders.filter(order => {
-            const orderDate = order.createdAt?.toDate?.();
-            return orderDate && orderDate >= thirtyDaysAgo;
-        });
-    }, [allOrders]);
-
+    // No need for client-side filtering of 'allOrders' anymore.
+    
     const sortedOrders = useMemo(() => {
         if (!orders) return [];
+        // Sort by date descending to get the most recent ones first
         return [...orders].sort((a, b) => (b.createdAt?.toDate?.().getTime() || 0) - (a.createdAt?.toDate?.().getTime() || 0));
     }, [orders]);
 
