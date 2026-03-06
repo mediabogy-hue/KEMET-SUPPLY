@@ -14,7 +14,7 @@ const fontSans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Tashghil Dropship',
+  title: 'KEMET-SUPPLY',
   description: 'Your dropshipping platform.',
 };
 

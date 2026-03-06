@@ -3,7 +3,7 @@
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { User, onAuthStateChanged, Unsubscribe, signOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase/provider'; // Corrected import path
 import type { UserProfile } from '@/lib/types';
 
 export interface SessionContextState {
@@ -26,23 +26,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const { auth, firestore } = useFirebase();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [authLoading, setAuthLoading] = useState(true); // For onAuthStateChanged
-  const [profileLoading, setProfileLoading] = useState(false); // For onSnapshot
+  const [isLoading, setIsLoading] = useState(true); // Start as true, set to false only when all checks are done.
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     let unsubscribeProfile: Unsubscribe | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
+      // Clean up previous profile listener if it exists
       if (unsubscribeProfile) {
         unsubscribeProfile();
         unsubscribeProfile = undefined;
       }
       
-      setUser(authUser); // Set user immediately, can be null
+      setUser(authUser); // Update user state
 
       if (authUser) {
-        setProfileLoading(true); // Start loading profile since we have an auth user
+        // If there's an authenticated user, we are still loading until we get their profile.
+        setIsLoading(true);
         const profileDocRef = doc(firestore, 'users', authUser.uid);
         
         unsubscribeProfile = onSnapshot(profileDocRef, (docSnap) => {
@@ -50,29 +51,29 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             setError(null);
           } else {
-            // Auth user exists but no profile. This is an invalid state.
+            // This is an invalid state (auth user without a profile).
+            // Clear the profile and force a sign-out.
             setProfile(null);
             console.error(`User with UID ${authUser.uid} has no profile. Forcing sign out.`);
-            // Force sign out, which will re-trigger onAuthStateChanged to a clean, logged-out state.
-            signOut(auth);
+            signOut(auth); // This will re-trigger onAuthStateChanged to a clean, logged-out state.
           }
-          setProfileLoading(false); // Profile loading is complete (or failed but handled).
+          setIsLoading(false); // Loading is complete.
         }, (profileError) => {
           console.error("Profile snapshot error:", profileError);
           setError(profileError);
-          setProfileLoading(false); // Finish loading profile (with an error)
+          setIsLoading(false); // Loading is complete (with an error).
         });
       } else {
-        // No auth user, so no profile to load. Reset all states.
+        // No authenticated user, so clear profile and finish loading.
         setProfile(null);
-        setProfileLoading(false);
+        setIsLoading(false);
       }
-      setAuthLoading(false); // Auth check is complete.
     }, (authError) => {
       console.error("Auth state error:", authError);
       setError(authError);
-      setAuthLoading(false);
-      setProfileLoading(false);
+      setUser(null);
+      setProfile(null);
+      setIsLoading(false); // Finish loading (with an error).
     });
 
     return () => {
@@ -86,7 +87,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const contextValue = useMemo((): SessionContextState => {
     const role = profile?.role || null;
     const isAdmin = role === 'Admin';
-    const isLoading = authLoading || profileLoading;
 
     return {
       user,
@@ -101,7 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isStaff: ['Admin', 'OrdersManager', 'FinanceManager'].includes(role || ''),
       isDropshipper: role === 'Dropshipper',
     };
-  }, [user, profile, authLoading, profileLoading, error]);
+  }, [user, profile, isLoading, error]);
 
   return (
     <SessionContext.Provider value={contextValue}>
