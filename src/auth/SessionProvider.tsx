@@ -32,22 +32,30 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setIsLoading(true);
+    let profileUnsubscribe: Unsubscribe | undefined;
+
     const authUnsubscribe = onAuthStateChanged(auth, (authUser) => {
+      // Clean up previous profile listener if it exists
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+      }
+
       if (authUser) {
         // User is authenticated, now fetch their profile
         const profileDocRef = doc(firestore, 'users', authUser.uid);
-        const profileUnsubscribe = onSnapshot(profileDocRef, 
+        profileUnsubscribe = onSnapshot(
+          profileDocRef,
           (docSnap) => {
             setUser(authUser); // Set user from auth
             if (docSnap.exists()) {
               setProfile({ id: docSnap.id, ...docSnap.data() } as UserProfile);
             } else {
-              // Auth record exists but no profile doc. This is a valid state.
+              // Auth record exists but no profile doc. This can be a valid state during signup.
               setProfile(null);
             }
             setError(null);
             setIsLoading(false); // Loading is complete
-          }, 
+          },
           (profileError: FirestoreError) => {
             console.error("Error fetching user profile:", profileError);
             setUser(authUser); // Still set the user
@@ -56,8 +64,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             setIsLoading(false); // Loading is complete, even with an error
           }
         );
-        // This inner unsubscribe is crucial for when the user logs out
-        return () => profileUnsubscribe();
       } else {
         // No user is authenticated
         setUser(null);
@@ -67,7 +73,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    return () => authUnsubscribe();
+    // Cleanup function for the main useEffect
+    return () => {
+      authUnsubscribe();
+      if (profileUnsubscribe) {
+        profileUnsubscribe();
+      }
+    };
   }, [auth, firestore]);
 
   const contextValue = useMemo((): SessionContextState => {
