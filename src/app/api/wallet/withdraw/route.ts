@@ -19,3 +19,11 @@ export async function POST(request: Request) {
     );
   }
 }
+import { NextResponse } from "next/server";
+
+export async function POST() {
+  return NextResponse.json(
+    { ok: false, message: "Withdraw API temporarily disabled" },
+    { status: 501 }
+  );
+}
