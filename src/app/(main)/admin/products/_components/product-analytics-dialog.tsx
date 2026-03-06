@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { useFirestore } from "@/firebase/provider";
+import { errorEmitter } from "@/firebase/error-emitter";
+import { FirestorePermissionError } from "@/firebase/errors";
 import { collection, query, where, getDocs, collectionGroup, orderBy, documentId } from "firebase/firestore";
 import type { Product, Order } from "@/lib/types";
 import { Users, MousePointerClick, ShoppingCart, Package, CornerDownLeft, Percent, BarChart2 } from "lucide-react";

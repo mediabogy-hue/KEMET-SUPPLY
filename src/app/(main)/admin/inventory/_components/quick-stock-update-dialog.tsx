@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { useFirestore } from "@/firebase/provider";
 import { useSession } from "@/auth/SessionProvider";
 import { doc, serverTimestamp, runTransaction, collection, query, orderBy, where, limit, getDocs } from "firebase/firestore";
 import type { Product } from "@/lib/types";

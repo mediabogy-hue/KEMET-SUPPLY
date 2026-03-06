@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/auth/SessionProvider';
 import { doc, serverTimestamp, writeBatch, collection } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore } from '@/firebase/provider';
 import type { UserProfile } from '@/lib/types';
 import { Play, Square } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';

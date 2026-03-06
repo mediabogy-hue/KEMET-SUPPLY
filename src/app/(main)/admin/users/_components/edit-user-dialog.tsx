@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { useFirestore } from "@/firebase/provider";
 import { doc, serverTimestamp, updateDoc } from "firebase/firestore";
 import type { UserProfile } from "@/lib/types";
 import { Switch } from "@/components/ui/switch";

@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Check, X, Pencil, Minus, Plus } from 'lucide-react';
-import { useFirestore, errorEmitter, FirestorePermissionError } from '@/firebase';
+import { useFirestore } from "@/firebase/provider";
 import { useSession } from '@/auth/SessionProvider';
 import { doc, runTransaction, serverTimestamp, collection } from 'firebase/firestore';
 import type { Product } from '@/lib/types';

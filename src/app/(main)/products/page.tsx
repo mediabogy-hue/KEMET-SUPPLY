@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore } from "@/firebase/provider";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import { collection, query } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';

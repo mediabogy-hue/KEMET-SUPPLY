@@ -2,8 +2,9 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useFirestore } from "@/firebase/provider";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import { useSession } from '@/auth/SessionProvider';
 import { collection, query, where, doc, getDoc, orderBy, limit } from 'firebase/firestore';
 import type { Order, Shipment, Product } from '@/lib/types';

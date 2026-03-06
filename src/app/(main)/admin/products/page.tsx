@@ -2,7 +2,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore } from "@/firebase/provider";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import { collection, query, doc, deleteDoc, orderBy, limit, updateDoc, serverTimestamp } from 'firebase/firestore';
 import type { Product } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';

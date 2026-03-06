@@ -1,6 +1,8 @@
 'use client';
 
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDoc } from "@/firebase/firestore/use-doc";
+import { useFirestore } from "@/firebase/provider";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import { doc } from 'firebase/firestore';
 import type { Product, UserProfile } from '@/lib/types';
 import { ProductView } from './_components/product-view';

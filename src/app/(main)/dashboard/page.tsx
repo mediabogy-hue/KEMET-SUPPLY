@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSession } from "@/auth/SessionProvider";
 import { useFirebase } from '@/firebase/provider';
-import { useCollection, useDoc, useMemoFirebase } from "@/firebase";
+import { useCollection } from "@/firebase/firestore/use-collection";
+import { useDoc } from "@/firebase/firestore/use-doc";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import type { Order, Wallet } from "@/lib/types";
 import { collection, query, where, Timestamp, doc } from "firebase/firestore";
 import { format, subDays } from 'date-fns';

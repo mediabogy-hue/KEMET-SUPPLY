@@ -19,7 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useFirestore, errorEmitter, FirestorePermissionError } from "@/firebase";
+import { useFirestore } from "@/firebase/provider";
 import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
 import { Loader2, Mail, MessageCircle } from "lucide-react";
 

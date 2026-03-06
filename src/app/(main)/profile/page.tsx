@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useSession } from '@/auth/SessionProvider';
-import { useFirestore } from '@/firebase';
+import { useFirestore } from "@/firebase/provider";
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 

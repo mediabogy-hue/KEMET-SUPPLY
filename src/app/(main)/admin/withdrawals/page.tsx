@@ -1,7 +1,8 @@
 
 'use client';
 import { useState, useMemo } from 'react';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection } from "@/firebase/firestore/use-collection";
+import { useMemoFirebase } from "@/hooks/useMemoFirebase";
 import { collection, query, orderBy, where, doc, writeBatch, serverTimestamp, increment, runTransaction, limit } from 'firebase/firestore';
 import type { WithdrawalRequest, Wallet } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
